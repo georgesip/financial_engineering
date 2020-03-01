@@ -1,0 +1,95 @@
+---
+title: "honors_thesis"
+author: "Georges Ip"
+date: "3/1/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Import libraries
+library(lattice)
+library(MASS)
+library(car)
+require(stats)
+require(stats4)
+library(KernSmooth)
+library(cluster)
+library(leaps)
+library(mgcv)
+library(rpart)
+library(mgcv)
+require("datasets")
+require(graphics)
+library(nlstools)
+library(fpp)
+library(fpp2)
+library(strucchange)
+library(Quandl)
+library(zoo)
+library(PerformanceAnalytics)
+library(quantmod)
+library(vars)
+library(lmtest)
+library(tseries)
+library(dplyr)
+library(lubridate)
+library(TTR)
+```
+
+Main stock dataset
+```{r}
+sp = get.hist.quote(instrument="^gspc", start="2009-01-01",
+                              end="2018-12-31", quote=c("High", "Low", "Adjusted"),
+                              provider="yahoo", origin="1970-01-01",
+                              compression="d", retclass="zoo")
+sp.data <- fortify.zoo(sp)
+#Take first difference
+sp.data <- sp.data %>%
+  mutate(first.diff = Adjusted - lag(Adjusted))
+#Convert difference into output vector
+sp.data <- sp.data %>% 
+  mutate(direction = ifelse(sp.data$first.diff  > 0, 1, 0))
+```
+
+Technical Indicators (1)
+```{r}
+#implement a simple 10 day moving average
+sp.data <- sp.data %>%
+  mutate(sma10 = rollmean(Adjusted, k = 10, fill = NA, align = "right"))
+#implement a weighted 10 day moving average
+sp.data <- sp.data %>%
+  mutate(wma10 = WMA(Adjusted, n = 10, wts = 1:10))
+#Implement momentum, the amount the price has changed over the last n periods
+momentum = diff(sp.data$Adjusted, lag = 4, differences = 1)
+fill = rep(NA, 4)
+momentum <- c(fill,momentum)
+momentum.df <- data.frame(momentum, colnames = "momentum")
+sp.data <- cbind(sp.data,momentum)
+#Implement stochastic K%, another indicator comparing the closing price of an asset to a range of its prices over a certain period of time n.
+#We choose n = 14 for now
+stochastic.k = stoch(sp.data[,c("High","Low", "Adjusted")], n = 14, bounded = TRUE)*100
+stochastic.k.df <- data.frame(stochastic.k)
+sp.data <- cbind(sp.data, stochastic.k.df)
+```
+
+Technical Indicators (2)
+```{r}
+
+```
+
+Fundamental Indicators
+```{r}
+
+```
+
+Sentiment Indicators
+```{r}
+
+```
+
+
+
