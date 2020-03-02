@@ -82,11 +82,20 @@ fill = rep(NA, 4)
 momentum <- c(fill,momentum)
 momentum.df <- data.frame(momentum, colnames = "momentum")
 sp.data <- cbind(sp.data,momentum)
+#quantmod method
+momentum = diff(GSPC$GSPC.Adjusted, lag = 4, differences = 1)
+GSPC$momentum <- momentum
 #Implement stochastic K%, another indicator comparing the closing price of an asset to a range of its prices over a certain period of time n.
 #We choose n = 14 for now
-stochastic.k = stoch(sp.data[,c("High","Low", "Adjusted")], n = 14, bounded = TRUE)*100
-stochastic.k.df <- data.frame(stochastic.k)
-sp.data <- cbind(sp.data, stochastic.k.df)
+GSPC$stochastic.k <- stoch(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Adjusted")], nFastK = 14, bounded = TRUE)*100
+#Implement stochastic D%, which is the 3-day mooving average of K%
+GSPC$stochastic.d <- stoch(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Adjusted")],  nFastD = 3, bounded = TRUE)*100
+#Implement RSI, the relative strength index. RSI is a measure of ratio of the recent upward price movements to the absolute price movement
+#We will use n=14 for now
+GSPC$RSI <- RSI(GSPC$GSPC.Adjusted, n = 14)
+#Implement MACD, moving average convergence divergence. This is another oscillator indicator that utilizes exponential moving averages to chart thet trend of price movements 
+GSPC$MACD <- MACD(GSPC[,"GSPC.Close"], 12, 26, 9, maType = "EMA")
+
 ```
 
 Technical Indicators (2)
