@@ -101,8 +101,12 @@ GSPC$BIAS6 <- (GSPC$GSPC.Close - SMA6)/SMA6 * 100
 #Create a dummy variable that counts the number of 1's in the last 12 periods
 psy.count <- GSPC$direction
 #GSPC$PSY12 <- 
-#Implement ASY1, which is the average return over the past n periods
-
+#Implement ASYn, which is the average return over the past n periods
+GSPC$ASY1 <- lag(GSPC$GSPC.Close.returns, n=1)
+GSPC$ASY2 <- SMA(GSPC$GSPC.Close.returns, n =2)
+GSPC$ASY3 <- SMA(GSPC$GSPC.Close.returns, n =3)
+GSPC$ASY4 <- SMA(GSPC$GSPC.Close.returns, n =4)
+GSPC$ASY5 <- SMA(GSPC$GSPC.Close.returns, n =5)
 ```
 
 Fundamental Indicators
