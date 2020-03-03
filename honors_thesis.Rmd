@@ -42,47 +42,32 @@ library(TTR)
 
 Main stock dataset
 ```{r}
-#Using get.hist.quote
-sp = get.hist.quote(instrument="^gspc", start="2009-01-01",
-                              end="2018-12-31", quote=c("High", "Low", "Adjusted"),
-                              provider="yahoo", origin="1970-01-01",
-                              compression="d", retclass="zoo")
-sp.data <- fortify.zoo(sp)
 #using quantmod
 sp500 <- new.env()
 getSymbols("^GSPC", env = sp500, src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
 GSPC <- sp500$GSPC
+#Add columns for returns
+#frist create a name vector for new returns
+names <- c("GSPC.Open.returns", "GSPC.High.returns", "GSPC.Low.returns", "GSPC.Close.returns", "GSPC.Volume.returns", "GSPC.Adjusted.returns")
+returns.data<-ROC(GSPC)
+names(returns.data) <- names
+#Drop volume returns as it is not applicable in this case
+returns.data <- subset(returns.data, select = -c(5))
+#now combine the two datasets
+GSPC<-merge(GSPC,returns.data,join='left') 
 #Take first difference
-sp.data <- sp.data %>%
-  mutate(first.diff = Adjusted - lag(Adjusted))
-#quantmod method
 GSPC$diff <- GSPC$GSPC.Adjusted - Lag(GSPC$GSPC.Adjusted)
 #Convert difference into output vector
-sp.data <- sp.data %>% 
-  mutate(direction = ifelse(sp.data$first.diff  > 0, 1, 0))
-#quantmod method
 GSPC$direction <- ifelse(GSPC$diff  > 0, 1, 0)
 ```
 
 Technical Indicators (1)
 ```{r}
 #implement a simple 10 day moving average
-sp.data <- sp.data %>%
-  mutate(sma10 = rollmean(Adjusted, k = 10, fill = NA, align = "right"))
-#quantmod method
 GSPC$SMA10 <- SMA(GSPC$GSPC.Adjusted, n = 10)
 #implement a weighted 10 day moving average
-sp.data <- sp.data %>%
-  mutate(wma10 = WMA(Adjusted, n = 10, wts = 1:10))
-#quantmod method
 GSPC$WMA10 <- WMA(GSPC$GSPC.Adjusted, n = 10, wts = 1:10)
 #Implement momentum, the amount the price has changed over the last n periods
-momentum = diff(sp.data$Adjusted, lag = 4, differences = 1)
-fill = rep(NA, 4)
-momentum <- c(fill,momentum)
-momentum.df <- data.frame(momentum, colnames = "momentum")
-sp.data <- cbind(sp.data,momentum)
-#quantmod method
 momentum = diff(GSPC$GSPC.Adjusted, lag = 4, differences = 1)
 GSPC$momentum <- momentum
 #Implement stochastic K%, another indicator comparing the closing price of an asset to a range of its prices over a certain period of time n.
@@ -95,11 +80,28 @@ GSPC$stochastic.d <- stoch(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Adjusted")],  n
 GSPC$RSI <- RSI(GSPC$GSPC.Adjusted, n = 14)
 #Implement MACD, moving average convergence divergence. This is another oscillator indicator that utilizes exponential moving averages to chart thet trend of price movements 
 GSPC$MACD <- MACD(GSPC[,"GSPC.Close"], 12, 26, 9, maType = "EMA")
-
+#Implement Larry William’s R%. This is a momentum indicator that tracks overbought and oversold levels. It is quite similar to the stochastic K%.
+GSPC$Williams.R <- WPR(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Close")])
+#Implement the A/D (Accumulation/Distribution) Oscillator is an indicator that aims to measure bullish and bearish price pressure. 
+GSPC$Williams.AD <- williamsAD(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Close")])
+#Implement the CCI (Commodity Channel Index). The CCI is another momentum indicator that is used to determine when an asset is reaching overbought or oversold conditions. 
+GSPC$CCI <- CCI(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Close")], n = 3, maType = "SMA", c = 0.015)
 ```
 
 Technical Indicators (2)
 ```{r}
+#Implement OBV, On Balance Volume. OBV is a momentum indicator that tracks changes in volume traded as well as price. 
+GSPC$OBV <- OBV(GSPC[,"GSPC.Close"], GSPC[,"GSPC.Volume"])
+#Implement a 5 period simple moving average
+GSPC$SMA5 <- SMA(GSPC$GSPC.Adjusted, n = 5)
+#Implement a 6 period bias indicator. This indicatoor derives a directional bias relative tot he 6 period moving average value
+SMA6 <- SMA(GSPC$GSPC.Adjusted, n = 6)
+GSPC$BIAS6 <- (GSPC$GSPC.Close - SMA6)/SMA6 * 100
+#Implement PSY12, which measures the ratio of rising periods over the last 12 periods
+#Create a dummy variable that counts the number of 1's in the last 12 periods
+psy.count <- GSPC$direction
+#GSPC$PSY12 <- 
+#Implement ASY1, which is the average return over the past n periods
 
 ```
 
