@@ -133,10 +133,4 @@ Sentiment Indicators
 ```
 
 
-Processing to export as csv to check
-```{r}
-zooA = as.zoo(GSPC, order.by = row.names(GSPC))
-write.zoo(GSPC, "gspc.csv", sep = ",")
-write.csv(as.data.frame(GSPC),"test.csv")
-```
 
