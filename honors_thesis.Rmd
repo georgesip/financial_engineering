@@ -39,6 +39,7 @@ library(dplyr)
 library(lubridate)
 library(TTR)
 library(zoo)
+library(repmis)
 ```
 
 Main stock dataset
@@ -113,7 +114,7 @@ GSPC$ASY5 <- SMA(GSPC$GSPC.Close.returns, n =5)
 Fundamental Indicators
 ```{r}
 #Import the China-US exchange rate
-USCHEX <- read.csv("~/Desktop/Econ198/code/Honors_thesis/DEXCHUS-edited.csv", stringsAsFactors=FALSE)
+USCHEX <- source_data("https://raw.githubusercontent.com/georgesip/financial_engineering/master/DEXCHUS-edited.csv")
 USCHEX <- head(USCHEX, -1)
 #Combine it with the GSPC dataset
 GSPC$USCHEX <- USCHEX$DEXCHUS
