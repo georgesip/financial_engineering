@@ -113,12 +113,6 @@ GSPC$ASY5 <- SMA(GSPC$GSPC.Close.returns, n =5)
 Fundamental Indicators
 ```{r}
 #Import the China-US exchange rate
-DEXCHUS <- read.csv("~/Desktop/Econ198/Data/DEXCHUS.csv", na.strings=".", stringsAsFactors=FALSE)
-#Pre-processing
-EX <- xts(DEXCHUS[, -1], order.by=as.Date(DEXCHUS$DATE))
-names(EX) <- "USCHEX"
-EX$USCHEX <-as.numeric(EX$USCHEX)
-#Uneven rows, I matched them to the GSPC index in excel
 USCHEX <- read.csv("~/Desktop/Econ198/code/Honors_thesis/DEXCHUS-edited.csv", stringsAsFactors=FALSE)
 USCHEX <- head(USCHEX, -1)
 #Combine it with the GSPC dataset
