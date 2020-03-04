@@ -100,6 +100,13 @@ GSPC$SMA5 <- SMA(GSPC$GSPC.Adjusted, n = 5)
 SMA6 <- SMA(GSPC$GSPC.Adjusted, n = 6)
 GSPC$BIAS6 <- (GSPC$GSPC.Close - SMA6)/SMA6 * 100
 #Implement PSY12, which measures the ratio of rising periods over the last 12 periods
+
+rolling12 <- rep(NA,nrow(GSPC))
+for(i in 1:nrow(GSPC)){
+  rolling12[i] <- sum(GSPC$direction[max(i-11, 1):i], na.rm = T)
+}
+
+
 #Create a dummy variable that counts the number of 1's in the last 12 periods
 psy.count <- GSPC$direction
 #GSPC$PSY12 <- 
