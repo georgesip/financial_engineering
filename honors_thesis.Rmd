@@ -102,8 +102,8 @@ GSPC$BIAS6 <- (GSPC$GSPC.Close - SMA6)/SMA6 * 100
 #Implement PSY12, which measures the ratio of rising periods over the last 12 periods
 
 GSPC$PSY12 <- rep(NA,nrow(GSPC))
-for(i in 1:nrow(GSPC)){
-GSPC$PSY12[i] <- sum(GSPC$direction[max(i-11, 1):i], na.rm = T)
+for(i in 12:nrow(GSPC)){
+GSPC$PSY12[i] <- sum(GSPC$direction[(i-11):i]) /12 *100
 }
 
 
