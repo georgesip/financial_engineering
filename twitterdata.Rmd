@@ -1,0 +1,35 @@
+---
+title: "twitterdata"
+author: "Georges Ip"
+date: "3/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#import libraries
+library(httpuv)
+library(rtweet)
+library(tidyverse)
+```
+
+```{r}
+#API keys
+api_key <- "6NR60ObEMULBYs0PBMDBDkGNr"
+api_secret_key <- "DcPhc6hxtCxvEeSEu8K08khnoN8MCL0ZN0cMOJ7cIAhpGjYBrt"
+access_token <- "1235338623538679809-jcyYbAtdVak4K1ZorbBbYVz56UO9Fv"
+access_token_secret <- "tkec7BNKeJvYeTzpZcFQIfRWF2hNEj2vQI0SHFMeK9GnT"
+
+## authenticate via web browser
+token <- create_token(
+  app = "uclaeconresearch",
+  consumer_key = api_key,
+  consumer_secret = api_secret_key,
+  access_token = access_token,
+  access_secret = access_token_secret)
+get_token()
+```
+
