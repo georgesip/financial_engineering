@@ -40,6 +40,7 @@ library(lubridate)
 library(TTR)
 library(zoo)
 library(repmis)
+library(readr)
 ```
 
 Main stock dataset
@@ -129,6 +130,15 @@ GSPC$USCHEX <- USCHEX$DEXCHUS
 
 Sentiment Indicators
 ```{r}
+#Import dataset
+news1 <- read_csv("2020-3-6-15-7-23-569723201808043-S&P 500 News - Investing.com-ScrapingData-ScrapeStorm.csv")
+news2 <- read_excel("2020-3-7-20-35-11-59646935038951-S&P 500 News - Investing.com-ScrapingData-ScrapeStorm-2.xlsx")
+news.1 <- head(news1, -1)
+news.full <- rbind(news.1,news2)
+```
+
+```{r}
+#Clean the dataset
 
 ```
 
