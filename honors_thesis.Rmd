@@ -135,11 +135,27 @@ news1 <- read_csv("2020-3-6-15-7-23-569723201808043-S&P 500 News - Investing.com
 news2 <- read_excel("2020-3-7-20-35-11-59646935038951-S&P 500 News - Investing.com-ScrapingData-ScrapeStorm-2.xlsx")
 news.1 <- head(news1, -1)
 news.full <- rbind(news.1,news2)
+#clean the data
+date.fill <- "- Mar 05, 2020"
+news.full$date[1:33] <- date.fill
 ```
 
 ```{r}
 #Clean the dataset
+news.full$date <- gsub("- ", "", news.full$date)
+news.full$date <- mdy(news.full$date)
+drops <- c('Title_link','js-external-link', 'articleDetails')
+news.full<-news.full[,!(names(news.full) %in% drops)]
+```
 
+Convert to sentiment scores
+```{r}
+
+```
+
+Integrate sentiment data with GSPC
+```{r}
+news.full <- arrange(news.full, date)
 ```
 
 
