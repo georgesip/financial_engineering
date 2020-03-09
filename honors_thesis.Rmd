@@ -41,6 +41,13 @@ library(TTR)
 library(zoo)
 library(repmis)
 library(readr)
+library(SentimentAnalysis)
+library(tm)
+library(tm.plugin.webmining)
+library(tm.plugin.sentiment)
+library(readxl)
+library(tidytext)
+library(wordcloud)
 ```
 
 Main stock dataset
@@ -135,27 +142,65 @@ news1 <- read_csv("2020-3-6-15-7-23-569723201808043-S&P 500 News - Investing.com
 news2 <- read_excel("2020-3-7-20-35-11-59646935038951-S&P 500 News - Investing.com-ScrapingData-ScrapeStorm-2.xlsx")
 news.1 <- head(news1, -1)
 news.full <- rbind(news.1,news2)
-#clean the data
-date.fill <- "- Mar 05, 2020"
-news.full$date[1:33] <- date.fill
 ```
 
 ```{r}
 #Clean the dataset
+date.fill <- "- Mar 05, 2020"
+news.full$date[1:33] <- date.fill
 news.full$date <- gsub("- ", "", news.full$date)
 news.full$date <- mdy(news.full$date)
 drops <- c('Title_link','js-external-link', 'articleDetails')
 news.full<-news.full[,!(names(news.full) %in% drops)]
+#rearrange chronological order
+news.full <- arrange(news.full, date)
+#clean the text itself from headlines
+news.full$Title <- tolower(news.full$Title)
+news.full$Title <- gsub("global markets-", "",news.full$Title)
+news.full$Title <- gsub("-", " ",news.full$Title)
+news.full$Title <- gsub("[[:punct:]]", " ", news.full$Title)
+#clean the text itself from description
+news.full$textDiv <- tolower(news.full$textDiv)
+news.full$textDiv <- gsub("\\s*\\([^\\)]+\\)","",news.full$textDiv)
+news.full$textDiv <- gsub("-", " ",news.full$textDiv)
+news.full$textDiv <- gsub("[[:punct:]]", " ", news.full$textDiv)
+#crete alternate set wiitout stop words
+news.full.alt <- news.full
+stopWords <- stopwords("SMART")
+news.full.alt$Title<- as.character(news.full.alt$Title) 
+'%nin%' <- Negate('%in%')
+news.full.alt$Title_clean<-lapply(news.full.alt$Title, function(x) {
+  chk <- unlist(strsplit(x," "))
+  p <- chk[chk %nin% stopWords]
+  paste(p,collapse = " ")
+})
+news.full.alt$desc_clean<-lapply(news.full.alt$textDiv, function(x) {
+  chk <- unlist(strsplit(x," "))
+  p <- chk[chk %nin% stopWords]
+  paste(p,collapse = " ")
+})
+#Convert to Corpus
+headlines <- Corpus(VectorSource(news.full$Title))
+descriptions <- Corpus(VectorSource(news.full$textDiv))
+#Wordcloud
+wordcloud(news.full$Title,min.freq = 10,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 500)
+Title_clean.df <- as.character(news.full.alt$Title_clean)
+wordcloud(Title_clean.df,min.freq = 10,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 500)
 ```
 
-Convert to sentiment scores
+Summary of data
 ```{r}
 
 ```
+
+Convert to sentiment
+```{r}
+sentiment <- analyzeSentiment(news.full$Title)
+```
+
 
 Integrate sentiment data with GSPC
 ```{r}
-news.full <- arrange(news.full, date)
 ```
 
 
