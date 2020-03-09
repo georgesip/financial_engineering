@@ -214,5 +214,23 @@ news.sentiment.title <- aggregate(news.full["title.sentiment"], by=news.full["da
 news.sentiment.desc <- aggregate(news.full["desc.sentiment"], by=news.full["date"], sum)
 ```
 
+```{r}
+gspc_sentiment_title <- rep(NA,nrow(GSPC))
+gspc_sentiment_desc <- rep(NA,nrow(GSPC))
+
+for(i in 1:nrow(GSPC)){
+  if(any(as.Date.character(index(GSPC)[i])==news.sentiment.title$date)){
+         gspc_sentiment_title[i] <- news.sentiment.title$title.sentiment[which(as.Date.character(index(GSPC)[i])==news.sentiment.title$date)]
+  }
+  if(any(as.Date.character(index(GSPC)[i])==news.sentiment.desc$date)){
+         gspc_sentiment_desc[i] <- news.sentiment.desc$desc.sentiment[which(as.Date.character(index(GSPC)[i])==news.sentiment.desc$date)]
+  }
+  
+}
+GSPC$gspc_sentiment_title <- gspc_sentiment_title
+GSPC$gspc_sentiment_desc <- gspc_sentiment_desc
+```
+
+
 
 
