@@ -180,27 +180,38 @@ news.full.alt$desc_clean<-lapply(news.full.alt$textDiv, function(x) {
   paste(p,collapse = " ")
 })
 #Convert to Corpus
-headlines <- Corpus(VectorSource(news.full$Title))
-descriptions <- Corpus(VectorSource(news.full$textDiv))
+#headlines <- Corpus(VectorSource(news.full$Title))
+#descriptions <- Corpus(VectorSource(news.full$textDiv))
+```
+
+Summary of data
+```{r}
 #Wordcloud
 wordcloud(news.full$Title,min.freq = 10,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 500)
 Title_clean.df <- as.character(news.full.alt$Title_clean)
 wordcloud(Title_clean.df,min.freq = 10,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 500)
 ```
 
-Summary of data
-```{r}
-
-```
-
 Convert to sentiment
 ```{r}
-sentiment <- analyzeSentiment(news.full$Title)
+data(DictionaryLM)
+#For headlines
+sentiment <- analyzeSentiment(news.full$Title, language = "english", aggregate = news.full$date)
+title.sentiment <- sentiment$SentimentLM
+news.full <- cbind(news.full, title.sentiment)
+#for descriptioin as a sanity check
+sentiment2 <- analyzeSentiment(news.full$textDiv, language = "english", aggregate = news.full$date)
+desc.sentiment <- sentiment2$SentimentLM
+news.full <- cbind(news.full, desc.sentiment)
 ```
 
+It seems that when we run the sentiment analysis on the description, we obtain greater granular detail. Whereas the short length of the headlines results in multile zero entries.
 
 Integrate sentiment data with GSPC
 ```{r}
+#First, group by date
+news.sentiment.title <- aggregate(news.full["title.sentiment"], by=news.full["date"], sum)
+news.sentiment.desc <- aggregate(news.full["desc.sentiment"], by=news.full["date"], sum)
 ```
 
 
