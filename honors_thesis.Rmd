@@ -113,8 +113,6 @@ GSPC$PSY12 <- rep(NA,nrow(GSPC))
 for(i in 12:nrow(GSPC)){
 GSPC$PSY12[i] <- sum(GSPC$direction[(i-11):i]) /12 *100
 }
-
-
 #Create a dummy variable that counts the number of 1's in the last 12 periods
 psy.count <- GSPC$direction
 #GSPC$PSY12 <- 
@@ -133,7 +131,10 @@ USCHEX <- source_data("https://raw.githubusercontent.com/georgesip/financial_eng
 USCHEX <- head(USCHEX, -1)
 #Combine it with the GSPC dataset
 GSPC$USCHEX <- USCHEX$DEXCHUS
-#Add DJIA indicator
+#Add DJIA indicator as another fundamental
+getSymbols("DJI", src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
+DJIA <- ROC(DJI)
+GSPC$DJIA.returns <- DJIA$DJI.Adjusted
 ```
 
 Sentiment Indicators
