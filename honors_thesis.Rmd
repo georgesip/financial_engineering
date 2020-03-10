@@ -234,6 +234,14 @@ GSPC$gspc_sentiment_desc <- gspc_sentiment_desc
 ```
 
 
+```{r}
+#lag predictors by 1 day
+for (i in 14:41){
+  GSPC[,i] <- lag(GSPC[,i],1)
+}
+```
+
+
 LASSO/RIDGE
 ```{r}
 #optimise using AIC and BIC
