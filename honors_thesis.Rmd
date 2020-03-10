@@ -74,7 +74,7 @@ GSPC$direction <- ifelse(GSPC$diff  > 0, 1, 0)
 Technical Indicators (1)
 ```{r}
 #implement a simple 10 day moving average
-GSPC$SMA10 <- SMA(GSPC$GSPC.Adjusted, n = 10)
+GSPC$SMA10 <- SMA(GSPC$GSPC.Close, n = 10)
 #implement a weighted 10 day moving average
 GSPC$WMA10 <- WMA(GSPC$GSPC.Adjusted, n = 10, wts = 1:10)
 #Implement momentum, the amount the price has changed over the last n periods
@@ -133,6 +133,7 @@ USCHEX <- source_data("https://raw.githubusercontent.com/georgesip/financial_eng
 USCHEX <- head(USCHEX, -1)
 #Combine it with the GSPC dataset
 GSPC$USCHEX <- USCHEX$DEXCHUS
+#Add DJIA indicator
 ```
 
 Sentiment Indicators
@@ -232,5 +233,21 @@ GSPC$gspc_sentiment_desc <- gspc_sentiment_desc
 ```
 
 
+LASSO/RIDGE
+```{r}
+#optimise using AIC and BIC
+```
+
+
+Random Forest
+```{r}
+
+```
+
+
+SVM
+```{r}
+
+```
 
 
