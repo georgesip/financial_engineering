@@ -241,6 +241,13 @@ for (i in 14:41){
 }
 ```
 
+```{r}
+#subset GSPC (missing news before 2014-03-25)
+full.GSPC <- GSPC
+GSPC <- GSPC[1315:2767,]
+```
+
+
 
 LASSO/RIDGE
 ```{r}
