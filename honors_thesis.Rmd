@@ -38,13 +38,10 @@ library(tseries)
 library(dplyr)
 library(lubridate)
 library(TTR)
-library(zoo)
 library(repmis)
 library(readr)
 library(SentimentAnalysis)
 library(tm)
-library(tm.plugin.webmining)
-library(tm.plugin.sentiment)
 library(readxl)
 library(tidytext)
 library(wordcloud)
@@ -234,11 +231,20 @@ GSPC$gspc_sentiment_desc <- gspc_sentiment_desc
 ```
 
 
+
+We have to offset our predictors as they are ordered time series. Hence, we aim to use predictors calculated at time t, to predict the direction at tme t+1.
 ```{r}
 #lag predictors by 1 day
 for (i in 14:41){
   GSPC[,i] <- lag(GSPC[,i],1)
 }
+```
+
+
+We cannot perform the usual resamepling methods suhc as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
+```{r}
+#We have to first preprocess the data, as there are huge gaps in the news dataset.
+
 ```
 
 
