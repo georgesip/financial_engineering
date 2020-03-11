@@ -286,6 +286,7 @@ lasso.grid <- expand.grid(lambda=seq(0,1,by=0.1),alpha=1)
 lasso.fit <- train(direction ~ .,
                     data = GSPC.train,
                     method = "glmnet",
+                    family = "bimomial",
                     preProcess = c("center", "scale"),
                     trControl = myTimeControl,
                     tuneGrid = lasso.grid)
