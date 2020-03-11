@@ -45,6 +45,7 @@ library(tm)
 library(readxl)
 library(tidytext)
 library(wordcloud)
+library(doParallel)
 ```
 
 Main stock dataset
