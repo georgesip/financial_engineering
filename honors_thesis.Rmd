@@ -48,6 +48,8 @@ library(wordcloud)
 library(doParallel)
 library(caret)
 library(imputeTS)
+library(randomForest)
+library(gbm)
 ```
 
 Main stock dataset
@@ -296,6 +298,21 @@ lasso.fit <- train(direction ~ .,
 
 Random Forest
 ```{r}
+set.seed(123)
+gspc.clean.df <- fortify.zoo(GSPC.clean)
+gspc.clean.df$direction <- factor(as.numeric(gspc.clean.df$direction == 2))
+rownames(gspc.clean.df) <- gspc.clean.df[,1]
+gspc.clean.df <- gspc.clean.df[,-1]
+rf <- randomForest(direction~., data=gspc.clean.df, importance = TRUE)
+rf$confusion
+mean(rf$predicted == gspc.clean.df$direction)
+```
+
+
+```{r}
+# set.seed(123)
+# boost <- gbm(direction~., data=gspc.clean.df, distribution = "bernoulli")
+# head(boost$fit)
 
 ```
 
