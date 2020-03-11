@@ -46,6 +46,8 @@ library(readxl)
 library(tidytext)
 library(wordcloud)
 library(doParallel)
+library(caret)
+library(imputeTS)
 ```
 
 Main stock dataset
@@ -67,6 +69,7 @@ GSPC<-merge(GSPC,returns.data,join='left')
 GSPC$diff <- GSPC$GSPC.Adjusted - Lag(GSPC$GSPC.Adjusted)
 #Convert difference into output vector
 GSPC$direction <- ifelse(GSPC$diff  > 0, 1, 0)
+GSPC$direction<-as.factor(GSPC$direction)
 ```
 
 Technical Indicators (1)
@@ -130,7 +133,7 @@ USCHEX <- head(USCHEX, -1)
 #Combine it with the GSPC dataset
 GSPC$USCHEX <- USCHEX$DEXCHUS
 #Add DJIA indicator as another fundamental
-getSymbols("DJI", src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
+getSymbols("^DJI", src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
 DJIA <- ROC(DJI)
 GSPC$DJIA.returns <- DJIA$DJI.Adjusted
 ```
@@ -205,7 +208,7 @@ desc.sentiment <- sentiment2$SentimentLM
 news.full <- cbind(news.full, desc.sentiment)
 ```
 
-It seems that when we run the sentiment analysis on the description, we obtain greater granular detail. Whereas the short length of the headlines results in multile zero entries.
+It seems that when we run the sentiment analysis on the description, we obtain greater granular detail. Whereas the short length of the headlines results in multiple zero entries.
 
 Integrate sentiment data with GSPC
 ```{r}
@@ -241,24 +244,52 @@ for (i in 14:41){
 }
 ```
 
+
+
+We cannot perform the usual resampling methods suhc as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
 ```{r}
+#We have to first preprocess the data, as there are huge gaps in the news dataset.
 #subset GSPC (missing news before 2014-03-25)
 full.GSPC <- GSPC
 GSPC <- GSPC[1315:2767,]
+#Remove all non-relevant variables from GSPC
+drops <- c("GSPC.Open","GSPC.High","GSPC.Low","GSPC.Close","GSPC.Volume","GSPC.Adjusted","GSPC.Open.returns","GSPC.High.returns", "GSPC.Low.returns","GSPC.Close.returns", "GSPC.Adjusted.returns", "diff")
+GSPC.clean<-GSPC[ , !(names(GSPC) %in% drops)]
+#Assess the number of NA's
+colSums(is.na(GSPC.clean))
+#There are still some NA's in USCHEX, we can do some imputation
+GSPC.clean <- na.locf(GSPC.clean)
+#prepare parallel computing method
+registerDoParallel(cores=6)
+#Split into training and test set
+GSPC.end <- floor(0.8*nrow(GSPC.clean)) #select the first 80% of the data
+GSPC.train <- GSPC.clean[1:GSPC.end] #assign the first 80% of the data to the train set
+GSPC.test <- GSPC.clean[(GSPC.end+1):nrow(GSPC.clean)]
 ```
 
 
-
-We cannot perform the usual resamepling methods suhc as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
+Prepare for caret library
 ```{r}
-#We have to first preprocess the data, as there are huge gaps in the news dataset.
-
+set.seed(123)
+myTimeControl <- trainControl(method = "timeslice",
+                              initialWindow = 32,
+                              horizon = 12,
+                              fixedWindow = FALSE,
+                              allowParallel = TRUE)
 ```
 
 
 LASSO/RIDGE
 ```{r}
 #optimise using AIC and BIC
+lasso.grid <- expand.grid(lambda=seq(0,1,by=0.1),alpha=1)
+lasso.fit <- train(direction ~ .,
+                    data = GSPC.train,
+                    method = "glmnet",
+                    preProcess = c("center", "scale"),
+                    trControl = myTimeControl,
+                    tuneGrid = lasso.grid)
+                    
 ```
 
 
