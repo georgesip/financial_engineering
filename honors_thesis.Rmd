@@ -51,6 +51,7 @@ library(imputeTS)
 library(randomForest)
 library(gbm)
 library(kernlab)
+library(e1071)
 ```
 
 Main stock dataset
@@ -312,21 +313,26 @@ mean(lasso.pred == GSPC.train$directio)
 
 Random Forest
 ```{r}
+#a quick way to find a good value for mtry
+bestMtry <- tuneRF(GSPC.train[,2:29], GSPC.train$direction, stepFactor = 1.5, improve = 1e-5, ntree = 1000)
+#Using caret to grid search
 rf.control <-trainControl(method = "timeslice",
                               initialWindow = 32,
                               horizon = 12,
                               fixedWindow = FALSE,
                               number = 10,
                               classProbs = TRUE, 
-                              summaryFunction = twoClassSummary,
                               allowParallel = TRUE)
+mtry <- sqrt(ncol(GSPC.train))
+rfgrid <- expand.grid(.mtry=mtry)
 rf.fit <- train(direction ~ .,
                     data = GSPC.train,
                     method = "rf",
-                    metric = metric,
+                    metric = 'Accuracy',
                     preProcess = c("center", "scale"),
                     trControl = rf.control,
-                    tunelength = 15)
+                    tuneGrid = rfgrid)
+print(rf.fit)
 ```
 
 
@@ -353,14 +359,18 @@ svm.tune <- train(x=trainX,
                   preProc = c("center","scale"),  # Center and scale data
                   metric="ROC",
                   trControl=myTimeControl)
-
-svm.fit <- train(direction ~ .,
-                    data = gspc.train.df,
-                    method = "svmRadial",
-                    family = "binomial",
-                    preProcess = c("center", "scale"),
-                    trControl = myTimeControl,
-                    tuneGrid = lasso.grid)
+svm.tune
+#we narrow the grid search
+svm.grid <- expand.grid(sigma = c(.040, .036, 0.030), C = c(0.25, 0.2, 0.35))
+svm.tune2 <- train(x=trainX,
+                  y= GSPC.train$direction,
+                  method = "svmRadial",   # Radial kernel
+                  tuneGrid = svm.grid,					# 9 values of the cost function
+                  preProc = c("center","scale"),  # Center and scale data
+                  metric="ROC",
+                  trControl=myTimeControl)
+svm.test <- predict(svm.tune, newdata = GSPC.test)
+confusionMatrix(svm.test, GSPC.test$direction)
 ```
 
 
