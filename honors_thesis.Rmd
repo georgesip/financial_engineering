@@ -310,6 +310,7 @@ rf <- randomForest(direction~., data=gspc.clean.df, importance = TRUE)
 rf$confusion
 mean(rf$predicted == gspc.clean.df$direction)
 ```
+
 ```{r}
 rf <- train(direction~., data=gspc.clean.df, method = "ranger")
 rf$results
