@@ -50,6 +50,7 @@ library(caret)
 library(imputeTS)
 library(randomForest)
 library(gbm)
+library(kernlab)
 ```
 
 Main stock dataset
@@ -283,6 +284,8 @@ myTimeControl <- trainControl(method = "timeslice",
                               initialWindow = 32,
                               horizon = 12,
                               fixedWindow = FALSE,
+                              classProbs = TRUE, 
+                              summaryFunction = twoClassSummary,
                               allowParallel = TRUE)
 ```
 
@@ -310,10 +313,6 @@ rf <- randomForest(direction~., data=gspc.clean.df, importance = TRUE)
 rf$confusion
 mean(rf$predicted == gspc.clean.df$direction)
 ```
-```{r}
-rf <- train(direction~., data=gspc.clean.df, method = "ranger")
-rf$results
-```
 
 
 ```{r}
@@ -326,7 +325,23 @@ rf$results
 
 SVM
 ```{r}
+#First we find the optimal tuning parameter
+trainX <- GSPC.train[,2:29]
+svm.tune <- train(x=trainX,
+                  y= GSPC.train$direction,
+                  method = "svmRadial",   # Radial kernel
+                  tuneLength = 9,					# 9 values of the cost function
+                  preProc = c("center","scale"),  # Center and scale data
+                  metric="ROC",
+                  trControl=myTimeControl)
 
+svm.fit <- train(direction ~ .,
+                    data = gspc.train.df,
+                    method = "svmRadial",
+                    family = "binomial",
+                    preProcess = c("center", "scale"),
+                    trControl = myTimeControl,
+                    tuneGrid = lasso.grid)
 ```
 
 
