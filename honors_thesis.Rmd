@@ -74,6 +74,8 @@ GSPC$diff <- GSPC$GSPC.Adjusted - Lag(GSPC$GSPC.Adjusted)
 #Convert difference into output vector
 GSPC$direction <- ifelse(GSPC$diff  > 0, 1, 0)
 GSPC$direction<-as.factor(GSPC$direction)
+#alternative dataset
+GSPC2<- GSPC
 ```
 
 Technical Indicators (1)
@@ -105,28 +107,29 @@ GSPC$CCI <- CCI(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Close")], n = 3, maType = 
 
 Technical Indicators (2)
 ```{r}
+
 #Implement OBV, On Balance Volume. OBV is a momentum indicator that tracks changes in volume traded as well as price. 
-GSPC$OBV <- OBV(GSPC[,"GSPC.Close"], GSPC[,"GSPC.Volume"])
+GSPC2$OBV <- OBV(GSPC2[,"GSPC.Close"], GSPC2[,"GSPC.Volume"])
 #Implement a 5 period simple moving average
-GSPC$SMA5 <- SMA(GSPC$GSPC.Adjusted, n = 5)
+GSPC2$SMA5 <- SMA(GSPC2$GSPC.Adjusted, n = 5)
 #Implement a 6 period bias indicator. This indicatoor derives a directional bias relative tot he 6 period moving average value
-SMA6 <- SMA(GSPC$GSPC.Adjusted, n = 6)
-GSPC$BIAS6 <- (GSPC$GSPC.Close - SMA6)/SMA6 * 100
+SMA6 <- SMA(GSPC2$GSPC.Adjusted, n = 6)
+GSPC2$BIAS6 <- (GSPC2$GSPC.Close - SMA6)/SMA6 * 100
 #Implement PSY12, which measures the ratio of rising periods over the last 12 periods
 
-GSPC$PSY12 <- rep(NA,nrow(GSPC))
-for(i in 12:nrow(GSPC)){
-GSPC$PSY12[i] <- sum(GSPC$direction[(i-11):i]) /12 *100
+GSPC2$PSY12 <- rep(NA,nrow(GSPC))
+for(i in 12:nrow(GSPC2)){
+GSPC2$PSY12[i] <- sum(GSPC2$direction[(i-11):i]) /12 *100
 }
 #Create a dummy variable that counts the number of 1's in the last 12 periods
-psy.count <- GSPC$direction
+psy.count <- GSPC2$direction
 #GSPC$PSY12 <- 
 #Implement ASYn, which is the average return over the past n periods
-GSPC$ASY1 <- lag(GSPC$GSPC.Close.returns, n=1)
-GSPC$ASY2 <- SMA(GSPC$GSPC.Close.returns, n =2)
-GSPC$ASY3 <- SMA(GSPC$GSPC.Close.returns, n =3)
-GSPC$ASY4 <- SMA(GSPC$GSPC.Close.returns, n =4)
-GSPC$ASY5 <- SMA(GSPC$GSPC.Close.returns, n =5)
+GSPC2$ASY1 <- lag(GSPC2$GSPC.Close.returns, n=1)
+GSPC2$ASY2 <- SMA(GSPC2$GSPC.Close.returns, n =2)
+GSPC2$ASY3 <- SMA(GSPC2$GSPC.Close.returns, n =3)
+GSPC2$ASY4 <- SMA(GSPC2$GSPC.Close.returns, n =4)
+GSPC2$ASY5 <- SMA(GSPC2$GSPC.Close.returns, n =5)
 ```
 
 Fundamental Indicators
@@ -244,7 +247,7 @@ We have to offset our predictors as they are ordered time series. Hence, we aim 
 ```{r}
 full.GSPC <- GSPC
 #lag predictors by 1 day
-for (i in 14:41){
+for (i in 14:32){
   GSPC[,i] <- lag(GSPC[,i],1)
 }
 ```
@@ -256,35 +259,35 @@ We cannot perform the usual resampling methods suhc as LOOCV or k-fold CV as our
 #We have to first preprocess the data, as there are huge gaps in the news dataset.
 #subset GSPC (missing news before 2014-03-25)
 GSPC <- GSPC[1315:2767,]
+#convert to dataframe for methods that require it
+set.seed(123)
+gspc.clean.df <- fortify.zoo(GSPC)
+gspc.clean.df$direction <- factor(as.numeric(gspc.clean.df$direction == 2))
+rownames(gspc.clean.df) <- gspc.clean.df[,1]
+gspc.clean.df <- gspc.clean.df[,-1]
+levels(gspc.clean.df$direction) <- c("down", "up")
 #Remove all non-relevant variables from GSPC
 drops <- c("GSPC.Open","GSPC.High","GSPC.Low","GSPC.Close","GSPC.Volume","GSPC.Adjusted","GSPC.Open.returns","GSPC.High.returns", "GSPC.Low.returns","GSPC.Close.returns", "GSPC.Adjusted.returns", "diff")
-GSPC.clean<-GSPC[ , !(names(GSPC) %in% drops)]
+GSPC.clean<-gspc.clean.df[ , !(names(gspc.clean.df) %in% drops)]
 #Play around with which variables result in greatest accuracy. Start by copying Kara's paper
-drops2 <- c("OBV","SMA5", "BIAS6","PSY12","ASY1", "ASY2", "ASY3","ASY4","ASY5","gspc_sentiment_title")
-GSPC.clean<-GSPC[ , !(names(GSPC) %in% drops2)]
+drops2 <- c("gspc_sentiment_title")
+GSPC.clean<-gspc.clean.df[ , !(names(gspc.clean.df) %in% drops2)]
 #Assess the number of NA's
 colSums(is.na(GSPC.clean))
 #There are still some NA's in USCHEX, we can do some imputation
 GSPC.clean <- na.locf(GSPC.clean)
 #prepare parallel computing method
 registerDoParallel(cores=6)
-#convert to dataframe for methods that require it
-set.seed(123)
-gspc.clean.df <- fortify.zoo(GSPC.clean)
-gspc.clean.df$direction <- factor(as.numeric(gspc.clean.df$direction == 2))
-rownames(gspc.clean.df) <- gspc.clean.df[,1]
-gspc.clean.df <- gspc.clean.df[,-1]
-levels(gspc.clean.df$direction) <- c("down", "up")
 #Split into training and test set
-GSPC.end <- floor(0.8*nrow(gspc.clean.df)) #select the first 80% of the data
-GSPC.train <- gspc.clean.df[1:GSPC.end,] #assign the first 80% of the data to the train set
-GSPC.test <- gspc.clean.df[(GSPC.end+1):nrow(gspc.clean.df),]
+GSPC.end <- floor(0.8*nrow(GSPC.clean)) #select the first 80% of the data
+GSPC.train <- GSPC.clean[1:GSPC.end,] #assign the first 80% of the data to the train set
+GSPC.test <- GSPC.clean[(GSPC.end+1):nrow(gspc.clean.df),]
 ```
 
 
 Prepare for caret library
 ```{r}
-set.seed(123)
+set.seed(1)
 myTimeControl <- trainControl(method = "timeslice",
                               initialWindow = 32,
                               horizon = 4,
@@ -316,7 +319,7 @@ mean(lasso.pred == GSPC.test$direction)
 Random Forest
 ```{r}
 #a quick way to find a good value for mtry
-bestMtry <- tuneRF(GSPC.train[,2:29], GSPC.train$direction, stepFactor = 1.5, improve = 1e-5, ntree = 1000)
+#bestMtry <- tuneRF(GSPC.train[,2:ncol(GSPC.train)], GSPC.train$direction, stepFactor = 1.5, improve = 1e-5, ntree = 1000)
 #Using caret to grid search
 rf.control <-trainControl(method = "timeslice",
                               initialWindow = 32,
@@ -335,6 +338,8 @@ rf.fit <- train(direction ~ .,
                     trControl = rf.control,
                     tuneGrid = rfgrid)
 print(rf.fit)
+rf.test <- predict(rf.fit, newdata = GSPC.test)
+confusionMatrix(rf.test, GSPC.test$direction)
 ```
 
 
@@ -342,8 +347,8 @@ SVM
 ```{r}
 #First we find the optimal tuning parameter
 trainX <- GSPC.train[,2:29]
-svm.tune <- train(x=trainX,
-                  y= GSPC.train$direction,
+svm.tune <- train(direction~.,
+                  data = GSPC.train,
                   method = "svmRadial",   # Radial kernel
                   tuneLength = 9,					# 9 values of the cost function
                   preProc = c("range"),  # Center and scale data
