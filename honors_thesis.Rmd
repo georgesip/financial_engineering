@@ -294,17 +294,19 @@ myTimeControl <- trainControl(method = "timeslice",
 LASSO/RIDGE
 ```{r}
 #optimise using AIC and BIC
-gspc.train.df <- as.data.frame(GSPC.train)
-gspc.train.df$direction <- factor(gspc.train.df$direction)
+
 lasso.grid <- expand.grid(lambda=seq(0,1,by=0.1),alpha=1)
 lasso.fit <- train(direction ~ .,
-                    data = gspc.train.df,
+                    data = GSPC.train,
                     method = "glmnet",
                     family = "binomial",
                     preProcess = c("center", "scale"),
                     trControl = myTimeControl,
                     tuneGrid = lasso.grid)
-                    
+summary(lasso.fit)
+lasso.pred <- predict(lasso.fit, GSPC.train)
+table(lasso.pred, GSPC.train$direction)
+mean(lasso.pred == GSPC.train$directio)                    
 ```
 
 
@@ -319,14 +321,6 @@ mean(rf$predicted == gspc.clean.df$direction)
 ```{r}
 rf <- train(direction~., data=gspc.clean.df, method = "ranger")
 rf$results
-=======
-
-```{r}
-# set.seed(123)
-# boost <- gbm(direction~., data=gspc.clean.df, distribution = "bernoulli")
-# head(boost$fit)
-
->>>>>>> 178649591ba665c884128b08eef44916c063303e
 ```
 
 
