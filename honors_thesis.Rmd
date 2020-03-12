@@ -290,11 +290,13 @@ myTimeControl <- trainControl(method = "timeslice",
 LASSO/RIDGE
 ```{r}
 #optimise using AIC and BIC
+gspc.train.df <- as.data.frame(GSPC.train)
+gspc.train.df$direction <- factor(gspc.train.df$direction)
 lasso.grid <- expand.grid(lambda=seq(0,1,by=0.1),alpha=1)
 lasso.fit <- train(direction ~ .,
-                    data = GSPC.train,
+                    data = gspc.train.df,
                     method = "glmnet",
-                    family = "bimomial",
+                    family = "binomial",
                     preProcess = c("center", "scale"),
                     trControl = myTimeControl,
                     tuneGrid = lasso.grid)
