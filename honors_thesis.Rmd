@@ -312,12 +312,30 @@ mean(lasso.pred == GSPC.train$directio)
 
 Random Forest
 ```{r}
+rf.control <-trainControl(method = "timeslice",
+                              initialWindow = 32,
+                              horizon = 12,
+                              fixedWindow = FALSE,
+                              number = 10,
+                              classProbs = TRUE, 
+                              summaryFunction = twoClassSummary,
+                              allowParallel = TRUE)
+rf.fit <- train(direction ~ .,
+                    data = GSPC.train,
+                    method = "rf",
+                    metric = metric,
+                    preProcess = c("center", "scale"),
+                    trControl = rf.control,
+                    tunelength = 15)
+```
+
+
+```{r}
 rf <- randomForest(direction~., data=gspc.clean.df, importance = TRUE)
 rf$confusion
 mean(rf$predicted == gspc.clean.df$direction)
 ```
 
-<<<<<<< HEAD
 ```{r}
 rf <- train(direction~., data=gspc.clean.df, method = "ranger")
 rf$results
