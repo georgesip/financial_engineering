@@ -313,21 +313,10 @@ rf <- randomForest(direction~., data=gspc.clean.df, importance = TRUE)
 rf$confusion
 mean(rf$predicted == gspc.clean.df$direction)
 ```
-<<<<<<< HEAD
 
 ```{r}
 rf <- train(direction~., data=gspc.clean.df, method = "ranger")
 rf$results
-```
-=======
->>>>>>> f45b422316d546355ab74b2f41c13fe7fee1d4ca
-
-
-```{r}
-# set.seed(123)
-# boost <- gbm(direction~., data=gspc.clean.df, distribution = "bernoulli")
-# head(boost$fit)
-
 ```
 
 
@@ -351,5 +340,7 @@ svm.fit <- train(direction ~ .,
                     trControl = myTimeControl,
                     tuneGrid = lasso.grid)
 ```
+
+
 
 
