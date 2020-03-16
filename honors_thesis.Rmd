@@ -109,27 +109,27 @@ Technical Indicators (2)
 ```{r}
 
 #Implement OBV, On Balance Volume. OBV is a momentum indicator that tracks changes in volume traded as well as price. 
-GSPC2$OBV <- OBV(GSPC2[,"GSPC.Close"], GSPC2[,"GSPC.Volume"])
+GSPC$OBV <- OBV(GSPC[,"GSPC.Close"], GSPC[,"GSPC.Volume"])
 #Implement a 5 period simple moving average
-GSPC2$SMA5 <- SMA(GSPC2$GSPC.Adjusted, n = 5)
+GSPC$SMA5 <- SMA(GSPC$GSPC.Adjusted, n = 5)
 #Implement a 6 period bias indicator. This indicatoor derives a directional bias relative tot he 6 period moving average value
-SMA6 <- SMA(GSPC2$GSPC.Adjusted, n = 6)
-GSPC2$BIAS6 <- (GSPC2$GSPC.Close - SMA6)/SMA6 * 100
+SMA6 <- SMA(GSPC$GSPC.Adjusted, n = 6)
+GSPC$BIAS6 <- (GSPC$GSPC.Close - SMA6)/SMA6 * 100
 #Implement PSY12, which measures the ratio of rising periods over the last 12 periods
 
-GSPC2$PSY12 <- rep(NA,nrow(GSPC))
-for(i in 12:nrow(GSPC2)){
-GSPC2$PSY12[i] <- sum(GSPC2$direction[(i-11):i]) /12 *100
+GSPC$PSY12 <- rep(NA,nrow(GSPC))
+for(i in 12:nrow(GSPC)){
+GSPC$PSY12[i] <- sum(GSPC$direction[(i-11):i]) /12 *100
 }
 #Create a dummy variable that counts the number of 1's in the last 12 periods
-psy.count <- GSPC2$direction
+psy.count <- GSPC$direction
 #GSPC$PSY12 <- 
 #Implement ASYn, which is the average return over the past n periods
-GSPC2$ASY1 <- lag(GSPC2$GSPC.Close.returns, n=1)
-GSPC2$ASY2 <- SMA(GSPC2$GSPC.Close.returns, n =2)
-GSPC2$ASY3 <- SMA(GSPC2$GSPC.Close.returns, n =3)
-GSPC2$ASY4 <- SMA(GSPC2$GSPC.Close.returns, n =4)
-GSPC2$ASY5 <- SMA(GSPC2$GSPC.Close.returns, n =5)
+GSPC$ASY1 <- lag(GSPC$GSPC.Close.returns, n=1)
+GSPC$ASY2 <- SMA(GSPC$GSPC.Close.returns, n =2)
+GSPC$ASY3 <- SMA(GSPC$GSPC.Close.returns, n =3)
+GSPC$ASY4 <- SMA(GSPC$GSPC.Close.returns, n =4)
+GSPC$ASY5 <- SMA(GSPC$GSPC.Close.returns, n =5)
 ```
 
 Fundamental Indicators
@@ -205,6 +205,7 @@ wordcloud(Title_clean.df,min.freq = 10,colors=brewer.pal(8, "Dark2"),random.colo
 Convert to sentiment
 ```{r}
 data(DictionaryLM)
+loadDictionaryLM()
 #For headlines
 sentiment <- analyzeSentiment(news.full$Title, language = "english", aggregate = news.full$date)
 title.sentiment <- sentiment$SentimentLM
@@ -213,6 +214,9 @@ news.full <- cbind(news.full, title.sentiment)
 sentiment2 <- analyzeSentiment(news.full$textDiv, language = "english", aggregate = news.full$date)
 desc.sentiment <- sentiment2$SentimentLM
 news.full <- cbind(news.full, desc.sentiment)
+
+#We can also use the other dictionaries to compare performance
+
 ```
 
 It seems that when we run the sentiment analysis on the description, we obtain greater granular detail. Whereas the short length of the headlines results in multiple zero entries.
@@ -253,8 +257,31 @@ for (i in 14:32){
 ```
 
 
+We now look at plots of the data
+```{r}
+plot.zoo(GSPC$diff, xlab = "Month", ylab = "First difference of adjusted returns", col = 'blue', lwd = 0.5)
+```
+We can see that taking the first difference detrended the time series, adn cetered it around zero. However, variance is still not constant, there is also clear signs of volatility clustering. However, we are focused on the direction of the time series, thus, the stationarity requirement is not as stringent. 
 
-We cannot perform the usual resampling methods suhc as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
+
+
+We then perform a test for granger causality between the difference and our different fundamental and sentiment variables
+```{r}
+#For sentiment in title with GSPC
+grangertest(diff~gspc_sentiment_title, order = 7, data=GSPC)
+grangertest(gspc_sentiment_title~diff, order = 1, data=GSPC)
+```
+It is evident that for sentiment scores constructed from headlines, the difference in prices granger causes sentiment.
+
+
+```{r}
+grangertest(diff~gspc_sentiment_desc, order = 1, data=GSPC)
+grangertest(gspc_sentiment_desc~diff, order = 1, data=GSPC)
+```
+
+
+
+We cannot perform the usual resampling methods such as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
 ```{r}
 #We have to first preprocess the data, as there are huge gaps in the news dataset.
 #subset GSPC (missing news before 2014-03-25)
@@ -266,31 +293,78 @@ gspc.clean.df$direction <- factor(as.numeric(gspc.clean.df$direction == 2))
 rownames(gspc.clean.df) <- gspc.clean.df[,1]
 gspc.clean.df <- gspc.clean.df[,-1]
 levels(gspc.clean.df$direction) <- c("down", "up")
+gspc.clean.df$direction <- as.factor(gspc.clean.df$direction)
 #Remove all non-relevant variables from GSPC
 drops <- c("GSPC.Open","GSPC.High","GSPC.Low","GSPC.Close","GSPC.Volume","GSPC.Adjusted","GSPC.Open.returns","GSPC.High.returns", "GSPC.Low.returns","GSPC.Close.returns", "GSPC.Adjusted.returns", "diff")
 GSPC.clean<-gspc.clean.df[ , !(names(gspc.clean.df) %in% drops)]
-#Play around with which variables result in greatest accuracy. Start by copying Kara's paper
-drops2 <- c("gspc_sentiment_title")
-GSPC.clean<-gspc.clean.df[ , !(names(gspc.clean.df) %in% drops2)]
+```
+
+
+The first dataset will be the full one with all variables included
+```{r}
 #Assess the number of NA's
 colSums(is.na(GSPC.clean))
 #There are still some NA's in USCHEX, we can do some imputation
 GSPC.clean <- na.locf(GSPC.clean)
-#prepare parallel computing method
-registerDoParallel(cores=6)
 #Split into training and test set
 GSPC.end <- floor(0.8*nrow(GSPC.clean)) #select the first 80% of the data
 GSPC.train <- GSPC.clean[1:GSPC.end,] #assign the first 80% of the data to the train set
-GSPC.test <- GSPC.clean[(GSPC.end+1):nrow(gspc.clean.df),]
+GSPC.test <- GSPC.clean[(GSPC.end+1):nrow(GSPC.clean),]
+```
+
+
+Create dataset for technical indicators (1) only, without sentiment and fundamentals
+```{r}
+GSPC.1 <- GSPC.clean
+drops1 <- c("OBV", "SMA5","BIAS6","PSY12","ASY1", "ASY2","ASY3","ASY4","ASY5","USCHEX","DJIA.returns", "gspc_sentiment_desc")
+GSPC.1<-GSPC.1[ , !(names(GSPC.1) %in% drops3)]
+#Split into training and test set
+GSPC.train.1 <- GSPC.1[1:GSPC.end,] #assign the first 80% of the data to the train set
+GSPC.test.1 <- GSPC.1[(GSPC.end+1):nrow(GSPC.1),]
+```
+
+
+
+Create dataset for technical indicators (2) only, without sentiment and fundamentals
+```{r}
+GSPC.2 <- GSPC.clean
+drops2 <- c("SMA10", "WMA10","momentum","fastK","fastD","stochastic.k","fastK.1","fastD.1","stochastic.d","RSI"      ,"macd","MACD","Williams.R","Williams.AD","CCI","USCHEX","DJIA.returns","gspc_sentiment_title", "gspc_sentiment_desc")
+GSPC.2<-GSPC.2[ , !(names(GSPC.2) %in% drops2)]
+#Split into training and test set
+GSPC.train.2 <- GSPC.2[1:GSPC.end,] #assign the first 80% of the data to the train set
+GSPC.test.2 <- GSPC.2[(GSPC.end+1):nrow(GSPC.2),]
+```
+
+
+Create dataset with fundamentals only
+```{r}
+GSPC.f <- GSPC.clean
+dropsf <- c("SMA10", "WMA10","momentum","fastK","fastD","stochastic.k","fastK.1","fastD.1","stochastic.d","RSI"      ,"macd","MACD","Williams.R","Williams.AD","CCI","OBV", "SMA5","BIAS6","PSY12","ASY1", "ASY2","ASY3","ASY4","ASY5","gspc_sentiment_title", "gspc_sentiment_desc")
+GSPC.f<-GSPC.f[ , !(names(GSPC.f) %in% dropsf)]
+#Split into training and test set
+GSPC.train.f <- GSPC.f[1:GSPC.end,] #assign the first 80% of the data to the train set
+GSPC.test.f <- GSPC.2[(GSPC.end+1):nrow(GSPC.f),]
+```
+
+Create dataset with only sentiment
+```{r}
+GSPC.s <- GSPC.clean
+dropss <- c("gspc_sentiment_title", "gspc_sentiment_desc")
+GSPC.s<-GSPC.s[ , !(names(GSPC.s) %in% dropss)]
+#Split into training and test set
+GSPC.train.s <- GSPC.s[1:GSPC.end,] #assign the first 80% of the data to the train set
+GSPC.test.s <- GSPC.s[(GSPC.end+1):nrow(GSPC.s),]
 ```
 
 
 Prepare for caret library
 ```{r}
 set.seed(1)
+#prepare parallel computing method
+registerDoParallel(cores=6)
 myTimeControl <- trainControl(method = "timeslice",
                               initialWindow = 32,
-                              horizon = 4,
+                              horizon = 2,
                               fixedWindow = FALSE,
                               classProbs = TRUE, 
                               summaryFunction = twoClassSummary,
@@ -298,14 +372,15 @@ myTimeControl <- trainControl(method = "timeslice",
 ```
 
 
-LASSO/RIDGE
+LASSO/RIDGE with technicals (1), fundamentals, and sentiment desc
 ```{r}
 #optimise using AIC and BIC
 
-lasso.grid <- expand.grid(lambda=seq(0,1,by=0.1),alpha=1)
+lasso.grid <- expand.grid(lambda=seq(0,1,by=0.05),alpha=1)
 lasso.fit <- train(direction ~ .,
                     data = GSPC.train,
                     method = "glmnet",
+                    metric = "ROC",
                     family = "binomial",
                     preProcess = c("range"),
                     trControl = myTimeControl,
@@ -313,6 +388,47 @@ lasso.fit <- train(direction ~ .,
 lasso.pred <- predict(lasso.fit, GSPC.test)
 confusionMatrix(lasso.pred, GSPC.test$direction)
 mean(lasso.pred == GSPC.test$direction)                    
+```
+We obtain an accuracy of only 46.7%
+
+
+Lasso with technical (1) only
+
+```{r}
+lasso.fit1 <- train(direction ~ .,
+                    data = GSPC.train1,
+                    method = "glmnet",
+                    metric = "ROC",
+                    family = "binomial",
+                    preProcess = c("range"),
+                    trControl = myTimeControl,
+                    tuneGrid = lasso.grid)
+lasso.pred2 <- predict(lasso.fit1, GSPC.test1)
+confusionMatrix(lasso.pred2, GSPC.test2$direction)
+```
+We obtain an accuracy of 49.48%
+
+
+Lasso with technical (2) only
+```{r}
+lasso.fit2 <- train(direction ~ .,
+                    data = GSPC.train2,
+                    method = "glmnet",
+                    metric = "ROC",
+                    family = "binomial",
+                    preProcess = c("range"),
+                    trControl = myTimeControl,
+                    tuneGrid = lasso.grid)
+lasso.pred2 <- predict(lasso.fit2, GSPC.test2)
+confusionMatrix(lasso.pred2, GSPC.test2$direction)
+mean(lasso.pred2 == GSPC.test2$direction)    
+```
+We obtain an accuracy of 57.39%
+
+
+Lasso with fundamentals only
+```{r}
+
 ```
 
 
@@ -373,7 +489,6 @@ confusionMatrix(rf.test2, GSPC.test$direction)
 SVM
 ```{r}
 #First we find the optimal tuning parameter
-trainX <- GSPC.train[,2:29]
 svm.tune <- train(direction~.,
                   data = GSPC.train,
                   method = "svmRadial",   # Radial kernel
@@ -384,8 +499,8 @@ svm.tune <- train(direction~.,
 svm.tune
 #we narrow the grid search
 svm.grid <- expand.grid(sigma = c(.040, .036, 0.030), C = c(0.25, 0.2, 0.35))
-svm.tune2 <- train(x=trainX,
-                  y= GSPC.train$direction,
+svm.tune2 <- train(direction~.,
+                  data = GSPC.train,
                   method = "svmRadial",   # Radial kernel
                   tuneGrid = svm.grid,					# 9 values of the cost function
                   preProc = c("range"),  # Center and scale data
@@ -394,7 +509,28 @@ svm.tune2 <- train(x=trainX,
 svm.test <- predict(svm.tune, newdata = GSPC.test)
 confusionMatrix(svm.test, GSPC.test$direction)
 ```
-
+Using technical indicators 2
+```{r}
+svm.tune3 <- train(direction~.,
+                  data = GSPC.train2,
+                  method = "svmRadial",   # Radial kernel
+                  tuneLength = 9,					# 9 values of the cost function
+                  preProc = c("range"),  # Center and scale data
+                  metric="ROC",
+                  trControl=myTimeControl)
+svm.tune2
+#we narrow the grid search
+svm.grid <- expand.grid(sigma = c(.040, .036, 0.030), C = c(0.25, 0.2, 0.35))
+svm.tune4 <- train(direction~.,
+                  data = GSPC.train2,
+                  method = "svmRadial",   # Radial kernel
+                  tuneGrid = svm.grid,					# 9 values of the cost function
+                  preProc = c("range"),  # Center and scale data
+                  metric="ROC",
+                  trControl=myTimeControl)
+svm.test3 <- predict(svm.tune2, newdata = GSPC.test2)
+confusionMatrix(svm.test3, GSPC.test2$direction)
+```
 
 
 
