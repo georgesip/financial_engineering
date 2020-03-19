@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r message=FALSE}
 #Import libraries
 library(lattice)
 library(MASS)
@@ -52,6 +52,7 @@ library(randomForest)
 library(gbm)
 library(kernlab)
 library(e1071)
+library(sentimentr)
 ```
 
 Main stock dataset
@@ -189,43 +190,82 @@ news.full.alt$desc_clean<-lapply(news.full.alt$textDiv, function(x) {
   p <- chk[chk %nin% stopWords]
   paste(p,collapse = " ")
 })
-#Convert to Corpus
-#headlines <- Corpus(VectorSource(news.full$Title))
-#descriptions <- Corpus(VectorSource(news.full$textDiv))
+#There are a few duplicated entries, let's remove them
+news.cleaned<-news.full %>%
+    distinct(Title, date, .keep_all = TRUE)
+news.cleaned.alt<-news.full.alt %>%
+    distinct(Title, date, .keep_all = TRUE)
 ```
 
 Summary of data
 ```{r}
 #Wordcloud
-wordcloud(news.full$Title,min.freq = 10,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 500)
-Title_clean.df <- as.character(news.full.alt$Title_clean)
+wordcloud(news.cleaned$Title,min.freq = 10,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 500)
+Title_clean.df <- as.character(news.cleaned.alt$Title_clean)
 wordcloud(Title_clean.df,min.freq = 10,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 500)
 ```
 
-Convert to sentiment
+Convert to sentiment (using SentimentAnalysis package)
 ```{r}
 data(DictionaryLM)
-loadDictionaryLM()
 #For headlines
-sentiment <- analyzeSentiment(news.full$Title, language = "english", aggregate = news.full$date)
-title.sentiment <- sentiment$SentimentLM
-news.full <- cbind(news.full, title.sentiment)
+sentiment <- analyzeSentiment(news.cleaned$Title, language = "english", aggregate = news.cleaned$date)
+title.sentimentLM <- sentiment$SentimentLM
+title.sentimentHE <- sentiment$SentimentHE
+news.cleaned <- cbind(news.cleaned, title.sentimentLM, title.sentimentHE)
 #for descriptioin as a sanity check
-sentiment2 <- analyzeSentiment(news.full$textDiv, language = "english", aggregate = news.full$date)
-desc.sentiment <- sentiment2$SentimentLM
-news.full <- cbind(news.full, desc.sentiment)
+sentiment2 <- analyzeSentiment(news.cleaned$textDiv, language = "english", aggregate = news.cleaned$date)
+desc.sentimentLM <- sentiment2$SentimentLM
+desc.sentimentHE <- sentiment2$SentimentHE
+news.cleaned <- cbind(news.cleaned, desc.sentimentLM, desc.sentimentHE)
+#Do the same for the alternate sentiment set
+sentiment.alt <- analyzeSentiment(news.cleaned.alt$Title, language = "english", aggregate = news.cleaned.alt$date)
+title.sentimentLM.alt <- sentiment.alt$SentimentLM
+title.sentimentHE.alt <- sentiment.alt$SentimentHE
+news.cleaned.alt <- cbind(news.cleaned.alt, title.sentimentLM.alt, title.sentimentHE.alt)
+#for descriptioin as a sanity check
+sentiment2.alt <- analyzeSentiment(news.cleaned.alt$textDiv, language = "english", aggregate = news.cleaned.alt$date)
+desc.sentimentLM.alt <- sentiment2.alt$SentimentLM
+desc.sentimentHE.alt <- sentiment2.alt$SentimentHE
+news.cleaned.alt <- cbind(news.cleaned.alt, desc.sentimentLM.alt, desc.sentimentHE.alt)
+```
 
-#We can also use the other dictionaries to compare performance
+It seems that when we run the sentiment analysis on the description, we obtain greater granular detail. Whereas the short length of the headlines results in multiple zero entries. (For the sentimentanalysis package).
+
+
+```{r}
+#We can also use the other packages to compare performance
+#Use sentimentr package, which is ana ugmented dictionary lookup that takes valence shifters into account.
+#work on the titles first
+sentences <- get_sentences(news.full$Title)
+(out <- with(
+    news.cleaned, 
+    sentiment_by(
+        get_sentences(Title), 
+        date
+    )
+))
+sentiment.ts <- xts(out$ave_sentiment, order.by=out$date)
+plot(sentiment.ts)
+#Another possible plot
+#First create a sample vector
+first.headlines <- head(news.cleaned$Title)
+highlight(head(out))
+```
+
+```{r}
+#Another optiun is the syuzhet package
 
 ```
 
-It seems that when we run the sentiment analysis on the description, we obtain greater granular detail. Whereas the short length of the headlines results in multiple zero entries.
 
-Integrate sentiment data with GSPC
+Integrate sentiment data with GSPC (SentimentAnalysis)
 ```{r}
 #First, group by date
-news.sentiment.title <- aggregate(news.full["title.sentiment"], by=news.full["date"], sum)
-news.sentiment.desc <- aggregate(news.full["desc.sentiment"], by=news.full["date"], sum)
+news.sentiment.title.LM <- aggregate(news.cleaned["title.sentimentLM"], by=news.full["date"], sum)
+news.sentiment.desc.LM <- aggregate(news.cleaned["desc.sentimentLM"], by=news.full["date"], sum)
+news.sentiment.title.HE <- aggregate(news.cleaned["title.sentimentHE"], by=news.full["date"], sum)
+news.sentiment.desc.HE <- aggregate(news.cleaned["desc.sentimentHE"], by=news.full["date"], sum)
 ```
 
 ```{r}
