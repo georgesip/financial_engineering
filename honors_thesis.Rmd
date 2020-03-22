@@ -41,7 +41,6 @@ library(TTR)
 library(repmis)
 library(readr)
 library(SentimentAnalysis)
-library(tm)
 library(readxl)
 library(tidytext)
 library(wordcloud)
@@ -53,6 +52,11 @@ library(gbm)
 library(kernlab)
 library(e1071)
 library(sentimentr)
+library(tidyverse)
+library(tm)
+library(rJava)
+library(coreNLP)
+library(syuzhet)
 ```
 
 Main stock dataset
@@ -60,7 +64,8 @@ Main stock dataset
 #using quantmod
 sp500 <- new.env()
 getSymbols("^GSPC", env = sp500, src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
-GSPC <- sp500$GSPC
+GSPCtemp <- sp500$GSPC
+GSPC<-GSPCtemp
 #Add columns for returns
 #frist create a name vector for new returns
 names <- c("GSPC.Open.returns", "GSPC.High.returns", "GSPC.Low.returns", "GSPC.Close.returns", "GSPC.Volume.returns", "GSPC.Adjusted.returns")
@@ -142,7 +147,8 @@ USCHEX <- head(USCHEX, -1)
 GSPC$USCHEX <- USCHEX$DEXCHUS
 #Add DJIA indicator as another fundamental
 getSymbols("^DJI", src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
-DJIA <- ROC(DJI)
+DJIAtemp <- ROC(DJI)
+DJIA<-DJIAtemp
 GSPC$DJIA.returns <- DJIA$DJI.Adjusted
 ```
 
@@ -154,7 +160,7 @@ news2 <- read_excel("2020-3-7-20-35-11-59646935038951-S&P 500 News - Investing.c
 news.1 <- head(news1, -1)
 news.full <- rbind(news.1,news2)
 ```
-
+Preprocessing of sentiment
 ```{r}
 #Clean the dataset
 date.fill <- "- Mar 05, 2020"
@@ -165,6 +171,7 @@ drops <- c('Title_link','js-external-link', 'articleDetails')
 news.full<-news.full[,!(names(news.full) %in% drops)]
 #rearrange chronological order
 news.full <- arrange(news.full, date)
+news.unclean <- news.full
 #clean the text itself from headlines
 news.full$Title <- tolower(news.full$Title)
 news.full$Title <- gsub("global markets-", "",news.full$Title)
@@ -195,6 +202,10 @@ news.cleaned<-news.full %>%
     distinct(Title, date, .keep_all = TRUE)
 news.cleaned.alt<-news.full.alt %>%
     distinct(Title, date, .keep_all = TRUE)
+news.unclean <- news.unclean %>%
+    distinct(Title, date, .keep_all = TRUE)
+#remove NA's 
+news.unclean[is.na(news.unclean)] = "unknown"
 ```
 
 Summary of data
@@ -235,9 +246,8 @@ It seems that when we run the sentiment analysis on the description, we obtain g
 
 ```{r}
 #We can also use the other packages to compare performance
-#Use sentimentr package, which is ana ugmented dictionary lookup that takes valence shifters into account.
+#Use sentimentr package, which is an augmented dictionary lookup that takes valence shifters into account.
 #work on the titles first
-sentences <- get_sentences(news.full$Title)
 (out <- with(
     news.cleaned, 
     sentiment_by(
@@ -247,15 +257,40 @@ sentences <- get_sentences(news.full$Title)
 ))
 sentiment.ts <- xts(out$ave_sentiment, order.by=out$date)
 plot(sentiment.ts)
+#Now work on descriptions
+(out.desc <- with(
+    news.unclean, 
+    sentiment_by(
+        get_sentences(news.unclean$textDiv), 
+        date
+    )
+))
+sentiment.desc.ts <- xts(out.desc$ave_sentiment, order.by=out.desc$date)
+plot(sentiment.desc.ts)
 #Another possible plot
-#First create a sample vector
 first.headlines <- head(news.cleaned$Title)
 highlight(head(out))
+first.desc <- head(news.unclean$textDiv)
+highlight(head(out.desc))
 ```
 
-```{r}
-#Another optiun is the syuzhet package
 
+Syuzhet package
+```{r}
+#Another option is the syuzhet package
+
+#Using Stanford coreNLP in syuzhet
+
+```
+
+
+Using stanford coreNLP
+```{r}
+volatiles = new.env(parent=emptyenv())
+tagger_path <- "C:\\Users\\Georges\\Desktop\\stanfordNLP"
+sentences.desc <- get_sentences(news.unclean$textDiv)
+stanford.annotate <- annotateString(sentences.desc)
+sentiment.stanford <- get_sentiment(sentences.desc, method="stanford", tagger_path)
 ```
 
 
