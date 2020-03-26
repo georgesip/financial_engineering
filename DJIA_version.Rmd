@@ -66,81 +66,72 @@ library(qdap)
 
 Main stock dataset
 ```{r}
-#using quantmod
-sp500 <- new.env()
-getSymbols("^GSPC", env = sp500, src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
-GSPCtemp <- sp500$GSPC
-GSPC<-GSPCtemp
+#Using quantmod
+getSymbols("^DJI", src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
+DJIA<-DJI
 #Add columns for returns
 #frist create a name vector for new returns
-names <- c("GSPC.Open.returns", "GSPC.High.returns", "GSPC.Low.returns", "GSPC.Close.returns", "GSPC.Volume.returns", "GSPC.Adjusted.returns")
-returns.data<-ROC(GSPC)
+names <- c("DJIA.Open.returns", "DJIA.High.returns", "DJIA.Low.returns", "DJIA.Close.returns", "DJIA.Volume.returns", "DJIA.Adjusted.returns")
+returns.data<-ROC(DJIA)
 names(returns.data) <- names
 #Drop volume returns as it is not applicable in this case
 returns.data <- subset(returns.data, select = -c(5))
 #now combine the two datasets
-GSPC<-merge(GSPC,returns.data,join='left') 
+DJIA<-merge(DJIA,returns.data,join='left') 
 #Take first difference
-GSPC$diff <- GSPC$GSPC.Adjusted - Lag(GSPC$GSPC.Adjusted)
+DJIA$diff <- DJIA$DJI.Close - Lag(DJIA$DJI.Close)
 #Convert difference into output vector
-GSPC$direction <- ifelse(GSPC$diff  > 0, 1, 0)
-GSPC$direction<-as.factor(GSPC$direction)
-#alternative dataset
-GSPC2<- GSPC
+DJIA$direction <- ifelse(DJIA$diff  > 0, 1, 0)
+DJIA$direction<-as.factor(DJIA$direction)
 ```
 
 Technical Indicators (1)
 ```{r}
 #implement a simple 10 day moving average
-GSPC$SMA10 <- SMA(GSPC$GSPC.Close, n = 10)
+DJIA$SMA10 <- SMA(DJIA$DJI.Close, n = 10)
 #implement a weighted 10 day moving average
-GSPC$WMA10 <- WMA(GSPC$GSPC.Adjusted, n = 10, wts = 1:10)
+DJIA$WMA10 <- WMA(DJIA$DJI.Adjusted, n = 10, wts = 1:10)
 #Implement momentum, the amount the price has changed over the last n periods
-momentum = diff(GSPC$GSPC.Adjusted, lag = 4, differences = 1)
-GSPC$momentum <- momentum
+momentum = diff(DJIA$DJI.Adjusted, lag = 4, differences = 1)
+DJIA$momentum <- momentum
 #Implement stochastic K%, another indicator comparing the closing price of an asset to a range of its prices over a certain period of time n.
 #We choose n = 14 for now
-GSPC$stochastic.k <- stoch(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Adjusted")], nFastK = 14, bounded = TRUE)*100
+DJIA$stochastic.k <- stoch(DJIA[,c("DJI.High","DJI.Low", "DJI.Adjusted")], nFastK = 14, bounded = TRUE)*100
 #Implement stochastic D%, which is the 3-day mooving average of K%
-GSPC$stochastic.d <- stoch(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Adjusted")],  nFastD = 3, bounded = TRUE)*100
+DJIA$stochastic.d <- stoch(DJIA[,c("DJI.High","DJI.Low", "DJI.Adjusted")],  nFastD = 3, bounded = TRUE)*100
 #Implement RSI, the relative strength index. RSI is a measure of ratio of the recent upward price movements to the absolute price movement
 #We will use n=14 for now
-GSPC$RSI <- RSI(GSPC$GSPC.Adjusted, n = 14)
+DJIA$RSI <- RSI(DJIA$DJI.Adjusted, n = 14)
 #Implement MACD, moving average convergence divergence. This is another oscillator indicator that utilizes exponential moving averages to chart thet trend of price movements 
-GSPC$MACD <- MACD(GSPC[,"GSPC.Close"], 12, 26, 9, maType = "EMA")
+DJIA$MACD <- MACD(DJIA[,"DJI.Close"], 12, 26, 9, maType = "EMA")
 #Implement Larry William’s R%. This is a momentum indicator that tracks overbought and oversold levels. It is quite similar to the stochastic K%.
-GSPC$Williams.R <- WPR(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Close")])
+DJIA$Williams.R <- WPR(DJIA[,c("DJI.High","DJI.Low", "DJI.Close")])
 #Implement the A/D (Accumulation/Distribution) Oscillator is an indicator that aims to measure bullish and bearish price pressure. 
-GSPC$Williams.AD <- williamsAD(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Close")])
+DJIA$Williams.AD <- williamsAD(DJIA[,c("DJI.High","DJI.Low", "DJI.Close")])
 #Implement the CCI (Commodity Channel Index). The CCI is another momentum indicator that is used to determine when an asset is reaching overbought or oversold conditions. 
-GSPC$CCI <- CCI(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Close")], n = 3, maType = "SMA", c = 0.015)
+DJIA$CCI <- CCI(DJIA[,c("DJI.High","DJI.Low", "DJI.Close")], n = 3, maType = "SMA", c = 0.015)
 ```
 
 Technical Indicators (2)
 ```{r}
-
 #Implement OBV, On Balance Volume. OBV is a momentum indicator that tracks changes in volume traded as well as price. 
-GSPC$OBV <- OBV(GSPC[,"GSPC.Close"], GSPC[,"GSPC.Volume"])
+DJIA$OBV <- OBV(DJIA[,"DJI.Close"], DJIA[,"DJI.Volume"])
 #Implement a 5 period simple moving average
-GSPC$SMA5 <- SMA(GSPC$GSPC.Adjusted, n = 5)
+DJIA$SMA5 <- SMA(DJIA$DJI.Adjusted, n = 5)
 #Implement a 6 period bias indicator. This indicatoor derives a directional bias relative tot he 6 period moving average value
-SMA6 <- SMA(GSPC$GSPC.Adjusted, n = 6)
-GSPC$BIAS6 <- (GSPC$GSPC.Close - SMA6)/SMA6 * 100
+SMA6 <- SMA(DJIA$DJI.Adjusted, n = 6)
+DJIA$BIAS6 <- (DJIA$DJI.Close - SMA6)/SMA6 * 100
 #Implement PSY12, which measures the ratio of rising periods over the last 12 periods
-
-GSPC$PSY12 <- rep(NA,nrow(GSPC))
-for(i in 12:nrow(GSPC)){
-GSPC$PSY12[i] <- sum(GSPC$direction[(i-11):i]) /12 *100
+DJIA$PSY12 <- rep(NA,nrow(DJIA))
+for(i in 12:nrow(DJIA)){
+DJIA$PSY12[i] <- sum(DJIA$direction[(i-11):i]) /12 *100
 }
-#Create a dummy variable that counts the number of 1's in the last 12 periods
-psy.count <- GSPC$direction
-#GSPC$PSY12 <- 
 #Implement ASYn, which is the average return over the past n periods
-GSPC$ASY1 <- lag(GSPC$GSPC.Close.returns, n=1)
-GSPC$ASY2 <- SMA(GSPC$GSPC.Close.returns, n =2)
-GSPC$ASY3 <- SMA(GSPC$GSPC.Close.returns, n =3)
-GSPC$ASY4 <- SMA(GSPC$GSPC.Close.returns, n =4)
-GSPC$ASY5 <- SMA(GSPC$GSPC.Close.returns, n =5)
+DJIA$ASY1 <- lag(DJIA$DJI.Close.returns, n=1)
+DJIA$ASY2 <- SMA(DJIA$DJI.Close.returns, n =2)
+DJIA$ASY3 <- SMA(DJIA$DJI.Close.returns, n =3)
+DJIA$ASY4 <- SMA(DJIA$DJI.Close.returns, n =4)
+DJIA$ASY5 <- SMA(DJIA$DJI.Close.returns, n =5)
 ```
 
 Fundamental Indicators
@@ -148,13 +139,19 @@ Fundamental Indicators
 #Import the China-US exchange rate
 USCHEX <- source_data("https://raw.githubusercontent.com/georgesip/financial_engineering/master/DEXCHUS-edited.csv")
 USCHEX <- head(USCHEX, -1)
-#Combine it with the GSPC dataset
-GSPC$USCHEX <- USCHEX$DEXCHUS
-#Add DJIA indicator as another fundamental
+#Combine it with the DJIA dataset
+DJIA$USCHEX <- USCHEX$DEXCHUS
+#Add SP500 indicator as another fundamental
+#using quantmod
+sp500 <- new.env()
+getSymbols("^DJI", env = sp500, src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
+DJItemp <- sp500$DJI
+DJI<-DJItemp
+
 getSymbols("^DJI", src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
 DJIAtemp <- ROC(DJI)
 DJIA<-DJIAtemp
-GSPC$DJIA.returns <- DJIA$DJI.Adjusted
+DJI$DJIA.returns <- DJIA$DJI.Adjusted
 ```
 
 Sentiment Indicators
@@ -316,7 +313,7 @@ sentiment.stanford <- get_sentiment(sentences.desc, method="stanford", tagger_pa
 ```
 
 
-Integrate sentiment data with GSPC (SentimentAnalysis)
+Integrate sentiment data with DJI (SentimentAnalysis)
 ```{r}
 #First, group by date
 news.sentiment.title.LM <- aggregate(news.cleaned["title.sentimentLM"], by=news.full["date"], mean)
@@ -326,70 +323,70 @@ news.sentiment.desc.HE <- aggregate(news.cleaned["desc.sentimentHE"], by=news.fu
 ```
 
 
-Match SentimentAnalysis to GSPC dataset based on date
+Match SentimentAnalysis to DJI dataset based on date
 ```{r}
-title.sa.LM <- rep(NA,nrow(GSPC))
-title.sa.HE <- rep(NA,nrow(GSPC))
-desc.sa.LM <- rep(NA,nrow(GSPC))
-desc.sa.HE <- rep(NA,nrow(GSPC))
+title.sa.LM <- rep(NA,nrow(DJI))
+title.sa.HE <- rep(NA,nrow(DJI))
+desc.sa.LM <- rep(NA,nrow(DJI))
+desc.sa.HE <- rep(NA,nrow(DJI))
 
 #Start with LM
-for(i in 1:nrow(GSPC)){
-  if(any(as.Date.character(index(GSPC)[i])==news.sentiment.title.LM$date)){
-         title.sa.LM[i] <- news.sentiment.title.LM$title.sentimentLM[which(as.Date.character(index(GSPC)[i])==news.sentiment.title.LM$date)]
+for(i in 1:nrow(DJI)){
+  if(any(as.Date.character(index(DJI)[i])==news.sentiment.title.LM$date)){
+         title.sa.LM[i] <- news.sentiment.title.LM$title.sentimentLM[which(as.Date.character(index(DJI)[i])==news.sentiment.title.LM$date)]
   }
-  if(any(as.Date.character(index(GSPC)[i])==news.sentiment.desc.LM$date)){
-         desc.sa.LM[i] <- news.sentiment.desc.LM$desc.sentimentLM[which(as.Date.character(index(GSPC)[i])==news.sentiment.desc.LM$date)]
+  if(any(as.Date.character(index(DJI)[i])==news.sentiment.desc.LM$date)){
+         desc.sa.LM[i] <- news.sentiment.desc.LM$desc.sentimentLM[which(as.Date.character(index(DJI)[i])==news.sentiment.desc.LM$date)]
   }
 }
-GSPC$title.sa <- title.sa.LM
-GSPC$desc.sa <- desc.sa.LM
+DJI$title.sa <- title.sa.LM
+DJI$desc.sa <- desc.sa.LM
 #now with HE
-for(i in 1:nrow(GSPC)){
-  if(any(as.Date.character(index(GSPC)[i])==news.sentiment.title.HE$date)){
-         title.sa.HE[i] <- news.sentiment.title.HE$title.sentimentHE[which(as.Date.character(index(GSPC)[i])==news.sentiment.title.HE$date)]
+for(i in 1:nrow(DJI)){
+  if(any(as.Date.character(index(DJI)[i])==news.sentiment.title.HE$date)){
+         title.sa.HE[i] <- news.sentiment.title.HE$title.sentimentHE[which(as.Date.character(index(DJI)[i])==news.sentiment.title.HE$date)]
   }
-  if(any(as.Date.character(index(GSPC)[i])==news.sentiment.desc.HE$date)){
-         desc.sa.HE[i] <- news.sentiment.desc.HE$desc.sentimentHE[which(as.Date.character(index(GSPC)[i])==news.sentiment.desc.HE$date)]
+  if(any(as.Date.character(index(DJI)[i])==news.sentiment.desc.HE$date)){
+         desc.sa.HE[i] <- news.sentiment.desc.HE$desc.sentimentHE[which(as.Date.character(index(DJI)[i])==news.sentiment.desc.HE$date)]
   }
 }
-GSPC$title.sa <- title.sa.HE
-GSPC$desc.sa <- desc.sa.HE
+DJI$title.sa <- title.sa.HE
+DJI$desc.sa <- desc.sa.HE
 ```
 
 
 Implement sentiment from sentimentr into the dataset
 ```{r}
-title.sr <- rep(NA,nrow(GSPC))
-desc.sr <- rep(NA,nrow(GSPC))
+title.sr <- rep(NA,nrow(DJI))
+desc.sr <- rep(NA,nrow(DJI))
 
-for(i in 1:nrow(GSPC)){
-  if(any(as.Date.character(index(GSPC)[i])==out.title$date)){
-         title.sr[i] <- out.title$ave_sentiment[which(as.Date.character(index(GSPC)[i])==out.title$date)]
+for(i in 1:nrow(DJI)){
+  if(any(as.Date.character(index(DJI)[i])==out.title$date)){
+         title.sr[i] <- out.title$ave_sentiment[which(as.Date.character(index(DJI)[i])==out.title$date)]
   }
-  if(any(as.Date.character(index(GSPC)[i])==out.desc$date)){
-         desc.sr[i] <- out.desc$ave_sentiment[which(as.Date.character(index(GSPC)[i])==out.desc$date)]
+  if(any(as.Date.character(index(DJI)[i])==out.desc$date)){
+         desc.sr[i] <- out.desc$ave_sentiment[which(as.Date.character(index(DJI)[i])==out.desc$date)]
   }
   
 }
-GSPC$title.sr <- title.sr
-GSPC$desc.sr <- desc.sr
+DJI$title.sr <- title.sr
+DJI$desc.sr <- desc.sr
 ```
 
 
 We have to offset our predictors as they are ordered time series. Hence, we aim to use predictors calculated at time t,to predict the direction at tme t+1.
 ```{r}
-full.GSPC <- GSPC
+full.DJI <- DJI
 #lag predictors by 1 day
 for (i in 14:43){
-  GSPC[,i] <- lag(GSPC[,i],1)
+  DJI[,i] <- lag(DJI[,i],1)
 }
 ```
 
 
 We now look at plots of the data
 ```{r}
-plot.zoo(GSPC$diff, xlab = "Month", ylab = "First difference of adjusted returns", col = 'blue', lwd = 0.5)
+plot.zoo(DJI$diff, xlab = "Month", ylab = "First difference of adjusted returns", col = 'blue', lwd = 0.5)
 ```
 We can see that taking the first difference detrended the time series, and cetered it around zero. However, variance is still not constant, there is also clear signs of volatility clustering. However, we are focused on the direction of the time series, thus, the stationarity requirement is not as stringent. 
 
@@ -397,16 +394,16 @@ We can see that taking the first difference detrended the time series, and ceter
 
 We then perform a test for granger causality between the difference and our different fundamental and sentiment variables
 ```{r}
-#For DJIA with GSPC
-grangertest(diff~DJIA.returns, order = 1, data=GSPC)
-grangertest(DJIA.returns~diff, order = 1, data=GSPC)
+#For DJIA with DJI
+grangertest(diff~DJIA.returns, order = 1, data=DJI)
+grangertest(DJIA.returns~diff, order = 1, data=DJI)
 ```
 It is evident that for sentiment scores constructed from headlines, the difference in prices granger causes sentiment.
 
 
 ```{r}
-grangertest(diff~gspc_sentiment_desc, order = 1, data=GSPC)
-grangertest(gspc_sentiment_desc~diff, order = 1, data=GSPC)
+grangertest(diff~DJI_sentiment_desc, order = 1, data=DJI)
+grangertest(DJI_sentiment_desc~diff, order = 1, data=DJI)
 ```
 
 
@@ -414,76 +411,76 @@ grangertest(gspc_sentiment_desc~diff, order = 1, data=GSPC)
 We cannot perform the usual resampling methods such as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
 ```{r}
 #We have to first preprocess the data, as there are huge gaps in the news dataset.
-#subset GSPC (missing news before 2014-03-25)
-GSPC <- GSPC[1315:2767,]
+#subset DJI (missing news before 2014-03-25)
+DJI <- DJI[1315:2767,]
 #convert to dataframe for methods that require it
 set.seed(123)
-gspc.clean.df <- fortify.zoo(GSPC)
-gspc.clean.df$direction <- factor(as.numeric(gspc.clean.df$direction == 2))
-rownames(gspc.clean.df) <- gspc.clean.df[,1]
-gspc.clean.df <- gspc.clean.df[,-1]
-levels(gspc.clean.df$direction) <- c("down", "up")
-gspc.clean.df$direction <- as.factor(gspc.clean.df$direction)
-#Remove all non-relevant variables from GSPC
-drops <- c("GSPC.Open","GSPC.High","GSPC.Low","GSPC.Close","GSPC.Volume","GSPC.Adjusted","GSPC.Open.returns","GSPC.High.returns", "GSPC.Low.returns","GSPC.Close.returns", "GSPC.Adjusted.returns", "diff")
-GSPC.clean<-gspc.clean.df[ , !(names(gspc.clean.df) %in% drops)]
+DJI.clean.df <- fortify.zoo(DJI)
+DJI.clean.df$direction <- factor(as.numeric(DJI.clean.df$direction == 2))
+rownames(DJI.clean.df) <- DJI.clean.df[,1]
+DJI.clean.df <- DJI.clean.df[,-1]
+levels(DJI.clean.df$direction) <- c("down", "up")
+DJI.clean.df$direction <- as.factor(DJI.clean.df$direction)
+#Remove all non-relevant variables from DJI
+drops <- c("DJI.Open","DJI.High","DJI.Low","DJI.Close","DJI.Volume","DJI.Adjusted","DJI.Open.returns","DJI.High.returns", "DJI.Low.returns","DJI.Close.returns", "DJI.Adjusted.returns", "diff")
+DJI.clean<-DJI.clean.df[ , !(names(DJI.clean.df) %in% drops)]
 ```
 
 
 The first dataset will be the full one with all variables included
 ```{r}
 #Assess the number of NA's
-colSums(is.na(GSPC.clean))
+colSums(is.na(DJI.clean))
 #There are still some NA's in USCHEX, we can do some imputation
-GSPC.clean <- na.locf(GSPC.clean)
+DJI.clean <- na.locf(DJI.clean)
 #Split into training and test set
-GSPC.end <- floor(0.8*nrow(GSPC.clean)) #select the first 80% of the data
-GSPC.train <- GSPC.clean[1:GSPC.end,] #assign the first 80% of the data to the train set
-GSPC.test <- GSPC.clean[(GSPC.end+1):nrow(GSPC.clean),]
+DJI.end <- floor(0.8*nrow(DJI.clean)) #select the first 80% of the data
+DJI.train <- DJI.clean[1:DJI.end,] #assign the first 80% of the data to the train set
+DJI.test <- DJI.clean[(DJI.end+1):nrow(DJI.clean),]
 ```
 
 
 Create dataset for technical indicators (1) only, without sentiment and fundamentals
 ```{r}
-GSPC.1 <- GSPC.clean
-drops1 <- c("OBV", "SMA5","BIAS6","PSY12","ASY1", "ASY2","ASY3","ASY4","ASY5","USCHEX","DJIA.returns", "gspc_sentiment_desc")
-GSPC.1<-GSPC.1[ , !(names(GSPC.1) %in% drops3)]
+DJI.1 <- DJI.clean
+drops1 <- c("OBV", "SMA5","BIAS6","PSY12","ASY1", "ASY2","ASY3","ASY4","ASY5","USCHEX","DJIA.returns", "DJI_sentiment_desc")
+DJI.1<-DJI.1[ , !(names(DJI.1) %in% drops3)]
 #Split into training and test set
-GSPC.train.1 <- GSPC.1[1:GSPC.end,] #assign the first 80% of the data to the train set
-GSPC.test.1 <- GSPC.1[(GSPC.end+1):nrow(GSPC.1),]
+DJI.train.1 <- DJI.1[1:DJI.end,] #assign the first 80% of the data to the train set
+DJI.test.1 <- DJI.1[(DJI.end+1):nrow(DJI.1),]
 ```
 
 
 
 Create dataset for technical indicators (2) only, without sentiment and fundamentals
 ```{r}
-GSPC.2 <- GSPC.clean
-drops2 <- c("SMA10", "WMA10","momentum","fastK","fastD","stochastic.k","fastK.1","fastD.1","stochastic.d","RSI"      ,"macd","MACD","Williams.R","Williams.AD","CCI","USCHEX","DJIA.returns","gspc_sentiment_title", "gspc_sentiment_desc")
-GSPC.2<-GSPC.2[ , !(names(GSPC.2) %in% drops2)]
+DJI.2 <- DJI.clean
+drops2 <- c("SMA10", "WMA10","momentum","fastK","fastD","stochastic.k","fastK.1","fastD.1","stochastic.d","RSI"      ,"macd","MACD","Williams.R","Williams.AD","CCI","USCHEX","DJIA.returns","DJI_sentiment_title", "DJI_sentiment_desc")
+DJI.2<-DJI.2[ , !(names(DJI.2) %in% drops2)]
 #Split into training and test set
-GSPC.train.2 <- GSPC.2[1:GSPC.end,] #assign the first 80% of the data to the train set
-GSPC.test.2 <- GSPC.2[(GSPC.end+1):nrow(GSPC.2),]
+DJI.train.2 <- DJI.2[1:DJI.end,] #assign the first 80% of the data to the train set
+DJI.test.2 <- DJI.2[(DJI.end+1):nrow(DJI.2),]
 ```
 
 
 Create dataset with fundamentals only
 ```{r}
-GSPC.f <- GSPC.clean
-dropsf <- c("SMA10", "WMA10","momentum","fastK","fastD","stochastic.k","fastK.1","fastD.1","stochastic.d","RSI"      ,"macd","MACD","Williams.R","Williams.AD","CCI","OBV", "SMA5","BIAS6","PSY12","ASY1", "ASY2","ASY3","ASY4","ASY5","gspc_sentiment_title", "gspc_sentiment_desc")
-GSPC.f<-GSPC.f[ , !(names(GSPC.f) %in% dropsf)]
+DJI.f <- DJI.clean
+dropsf <- c("SMA10", "WMA10","momentum","fastK","fastD","stochastic.k","fastK.1","fastD.1","stochastic.d","RSI"      ,"macd","MACD","Williams.R","Williams.AD","CCI","OBV", "SMA5","BIAS6","PSY12","ASY1", "ASY2","ASY3","ASY4","ASY5","DJI_sentiment_title", "DJI_sentiment_desc")
+DJI.f<-DJI.f[ , !(names(DJI.f) %in% dropsf)]
 #Split into training and test set
-GSPC.train.f <- GSPC.f[1:GSPC.end,] #assign the first 80% of the data to the train set
-GSPC.test.f <- GSPC.2[(GSPC.end+1):nrow(GSPC.f),]
+DJI.train.f <- DJI.f[1:DJI.end,] #assign the first 80% of the data to the train set
+DJI.test.f <- DJI.2[(DJI.end+1):nrow(DJI.f),]
 ```
 
 Create dataset with only sentiment
 ```{r}
-GSPC.s <- GSPC.clean
-dropss <- c("gspc_sentiment_title", "gspc_sentiment_desc")
-GSPC.s<-GSPC.s[ , !(names(GSPC.s) %in% dropss)]
+DJI.s <- DJI.clean
+dropss <- c("DJI_sentiment_title", "DJI_sentiment_desc")
+DJI.s<-DJI.s[ , !(names(DJI.s) %in% dropss)]
 #Split into training and test set
-GSPC.train.s <- GSPC.s[1:GSPC.end,] #assign the first 80% of the data to the train set
-GSPC.test.s <- GSPC.s[(GSPC.end+1):nrow(GSPC.s),]
+DJI.train.s <- DJI.s[1:DJI.end,] #assign the first 80% of the data to the train set
+DJI.test.s <- DJI.s[(DJI.end+1):nrow(DJI.s),]
 ```
 
 
@@ -508,16 +505,16 @@ LASSO/RIDGE with technicals (1), fundamentals, and sentiment desc
 
 lasso.grid <- expand.grid(lambda=seq(0,1,by=0.05),alpha=1)
 lasso.fit <- train(direction ~ .,
-                    data = GSPC.train,
+                    data = DJI.train,
                     method = "glmnet",
                     metric = "ROC",
                     family = "binomial",
                     preProcess = c("range"),
                     trControl = myTimeControl,
                     tuneGrid = lasso.grid)
-lasso.pred <- predict(lasso.fit, GSPC.test)
-confusionMatrix(lasso.pred, GSPC.test$direction)
-mean(lasso.pred == GSPC.test$direction)                    
+lasso.pred <- predict(lasso.fit, DJI.test)
+confusionMatrix(lasso.pred, DJI.test$direction)
+mean(lasso.pred == DJI.test$direction)                    
 ```
 We obtain an accuracy of only 46.7%
 
@@ -526,15 +523,15 @@ Lasso with technical (1) only
 
 ```{r}
 lasso.fit1 <- train(direction ~ .,
-                    data = GSPC.train1,
+                    data = DJI.train1,
                     method = "glmnet",
                     metric = "ROC",
                     family = "binomial",
                     preProcess = c("range"),
                     trControl = myTimeControl,
                     tuneGrid = lasso.grid)
-lasso.pred2 <- predict(lasso.fit1, GSPC.test1)
-confusionMatrix(lasso.pred2, GSPC.test2$direction)
+lasso.pred2 <- predict(lasso.fit1, DJI.test1)
+confusionMatrix(lasso.pred2, DJI.test2$direction)
 ```
 We obtain an accuracy of 49.48%
 
@@ -542,16 +539,16 @@ We obtain an accuracy of 49.48%
 Lasso with technical (2) only
 ```{r}
 lasso.fit2 <- train(direction ~ .,
-                    data = GSPC.train2,
+                    data = DJI.train2,
                     method = "glmnet",
                     metric = "ROC",
                     family = "binomial",
                     preProcess = c("range"),
                     trControl = myTimeControl,
                     tuneGrid = lasso.grid)
-lasso.pred2 <- predict(lasso.fit2, GSPC.test2)
-confusionMatrix(lasso.pred2, GSPC.test2$direction)
-mean(lasso.pred2 == GSPC.test2$direction)    
+lasso.pred2 <- predict(lasso.fit2, DJI.test2)
+confusionMatrix(lasso.pred2, DJI.test2$direction)
+mean(lasso.pred2 == DJI.test2$direction)    
 ```
 We obtain an accuracy of 57.39%
 
@@ -559,15 +556,15 @@ We obtain an accuracy of 57.39%
 Lasso with fundamentals only
 ```{r}
 lasso.fit.f <- train(direction ~ .,
-                    data = GSPC.train.f,
+                    data = DJI.train.f,
                     method = "glmnet",
                     metric = "ROC",
                     family = "binomial",
                     preProcess = c("range"),
                     trControl = myTimeControl,
                     tuneGrid = lasso.grid)
-lasso.pred.f <- predict(lasso.fit.f, GSPC.test.f)
-confusionMatrix(lasso.pred.f, GSPC.test.f$direction)
+lasso.pred.f <- predict(lasso.fit.f, DJI.test.f)
+confusionMatrix(lasso.pred.f, DJI.test.f$direction)
 ```
 
 LASSO wiith sentiment only from SentimentAnalysis method
@@ -584,7 +581,7 @@ LASSO with sentiment only from sentimentr method
 Random Forest
 ```{r}
 #a quick way to find a good value for mtry
-#bestMtry <- tuneRF(GSPC.train[,2:ncol(GSPC.train)], GSPC.train$direction, stepFactor = 1.5, improve = 1e-5, ntree = 1000)
+#bestMtry <- tuneRF(DJI.train[,2:ncol(DJI.train)], DJI.train$direction, stepFactor = 1.5, improve = 1e-5, ntree = 1000)
 #Using caret to grid search
 rf.control <-trainControl(method = "timeslice",
                               initialWindow = 32,
@@ -593,24 +590,24 @@ rf.control <-trainControl(method = "timeslice",
                               number = 10,
                               classProbs = TRUE, 
                               allowParallel = TRUE)
-mtry <- sqrt(ncol(GSPC.train))
+mtry <- sqrt(ncol(DJI.train))
 rfgrid <- expand.grid(.mtry=mtry)
 rf.fit <- train(direction ~ .,
-                    data = GSPC.train,
+                    data = DJI.train,
                     method = "rf",
                     metric = 'Accuracy',
                     preProcess = c("range"),
                     trControl = rf.control,
                     tuneGrid = rfgrid)
 print(rf.fit)
-rf.test <- predict(rf.fit, newdata = GSPC.test)
-confusionMatrix(rf.test, GSPC.test$direction)
+rf.test <- predict(rf.fit, newdata = DJI.test)
+confusionMatrix(rf.test, DJI.test$direction)
 #Alternatively
 tune_grid <- expand.grid(
   mtry = c(
-    ncol(GSPC.train)-1, # p
-    ncol((GSPC.train)-1)/ 3, # p / 3
-    ceiling(sqrt(ncol(GSPC.train))) # square root of p
+    ncol(DJI.train)-1, # p
+    ncol((DJI.train)-1)/ 3, # p / 3
+    ceiling(sqrt(ncol(DJI.train))) # square root of p
   )
 )
 rf.control2 <-trainControl(method = "timeslice",
@@ -623,15 +620,15 @@ rf.control2 <-trainControl(method = "timeslice",
                               allowParallel = TRUE,
                               repeats = 3)
 rf.fit2 <- train(direction ~ .,
-                    data = GSPC.train,
+                    data = DJI.train,
                     method = "rf",
                     metric = 'Accuracy',
                     preProcess = c("range"),
                     trControl = rf.control2,
                     tuneGrid = tune_grid)
 print(rf.fit2)
-rf.test2 <- predict(rf.fit2, newdata = GSPC.test)
-confusionMatrix(rf.test2, GSPC.test$direction)
+rf.test2 <- predict(rf.fit2, newdata = DJI.test)
+confusionMatrix(rf.test2, DJI.test$direction)
 ```
 
 
@@ -639,7 +636,7 @@ SVM
 ```{r}
 #First we find the optimal tuning parameter
 svm.tune <- train(direction~.,
-                  data = GSPC.train,
+                  data = DJI.train,
                   method = "svmRadial",   # Radial kernel
                   tuneLength = 9,					# 9 values of the cost function
                   preProc = c("range"),  # Center and scale data
@@ -649,19 +646,19 @@ svm.tune
 #we narrow the grid search
 svm.grid <- expand.grid(sigma = c(.040, .036, 0.030), C = c(0.25, 0.2, 0.35))
 svm.tune2 <- train(direction~.,
-                  data = GSPC.train,
+                  data = DJI.train,
                   method = "svmRadial",   # Radial kernel
                   tuneGrid = svm.grid,					# 9 values of the cost function
                   preProc = c("range"),  # Center and scale data
                   metric="ROC",
                   trControl=myTimeControl)
-svm.test <- predict(svm.tune, newdata = GSPC.test)
-confusionMatrix(svm.test, GSPC.test$direction)
+svm.test <- predict(svm.tune, newdata = DJI.test)
+confusionMatrix(svm.test, DJI.test$direction)
 ```
 Using technical indicators 2
 ```{r}
 svm.tune3 <- train(direction~.,
-                  data = GSPC.train2,
+                  data = DJI.train2,
                   method = "svmRadial",   # Radial kernel
                   tuneLength = 9,					# 9 values of the cost function
                   preProc = c("range"),  # Center and scale data
@@ -671,14 +668,14 @@ svm.tune2
 #we narrow the grid search
 svm.grid <- expand.grid(sigma = c(.040, .036, 0.030), C = c(0.25, 0.2, 0.35))
 svm.tune4 <- train(direction~.,
-                  data = GSPC.train2,
+                  data = DJI.train2,
                   method = "svmRadial",   # Radial kernel
                   tuneGrid = svm.grid,					# 9 values of the cost function
                   preProc = c("range"),  # Center and scale data
                   metric="ROC",
                   trControl=myTimeControl)
-svm.test3 <- predict(svm.tune2, newdata = GSPC.test2)
-confusionMatrix(svm.test3, GSPC.test2$direction)
+svm.test3 <- predict(svm.tune2, newdata = DJI.test2)
+confusionMatrix(svm.test3, DJI.test2$direction)
 ```
 
 
