@@ -65,13 +65,13 @@ library(qdap)
 ```
 
 Main stock dataset
-```{r}
+```{r message=FALSE}
 #Using quantmod
 getSymbols("^DJI", src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
 DJIA<-DJI
 #Add columns for returns
 #frist create a name vector for new returns
-names <- c("DJIA.Open.returns", "DJIA.High.returns", "DJIA.Low.returns", "DJIA.Close.returns", "DJIA.Volume.returns", "DJIA.Adjusted.returns")
+names <- c("DJI.Open.returns", "DJI.High.returns", "DJI.Low.returns", "DJI.Close.returns", "DJI.Volume.returns", "DJI.Adjusted.returns")
 returns.data<-ROC(DJIA)
 names(returns.data) <- names
 #Drop volume returns as it is not applicable in this case
@@ -118,9 +118,9 @@ Technical Indicators (2)
 DJIA$OBV <- OBV(DJIA[,"DJI.Close"], DJIA[,"DJI.Volume"])
 #Implement a 5 period simple moving average
 DJIA$SMA5 <- SMA(DJIA$DJI.Adjusted, n = 5)
-#Implement a 6 period bias indicator. This indicatoor derives a directional bias relative tot he 6 period moving average value
+#Implement a 6 period bias indicator. This indicator derives a directional bias relative tot he 6 period moving average value
 SMA6 <- SMA(DJIA$DJI.Adjusted, n = 6)
-DJIA$BIAS6 <- (DJIA$DJI.Close - SMA6)/SMA6 * 100
+DJIA$BIAS6 <- (DJIA$DJI.Adjusted - SMA6)/SMA6 * 100
 #Implement PSY12, which measures the ratio of rising periods over the last 12 periods
 DJIA$PSY12 <- rep(NA,nrow(DJIA))
 for(i in 12:nrow(DJIA)){
@@ -135,7 +135,7 @@ DJIA$ASY5 <- SMA(DJIA$DJI.Close.returns, n =5)
 ```
 
 Fundamental Indicators
-```{r}
+```{r message=FALSE}
 #Import the China-US exchange rate
 USCHEX <- source_data("https://raw.githubusercontent.com/georgesip/financial_engineering/master/DEXCHUS-edited.csv")
 USCHEX <- head(USCHEX, -1)
@@ -143,15 +143,9 @@ USCHEX <- head(USCHEX, -1)
 DJIA$USCHEX <- USCHEX$DEXCHUS
 #Add SP500 indicator as another fundamental
 #using quantmod
-sp500 <- new.env()
-getSymbols("^DJI", env = sp500, src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
-DJItemp <- sp500$DJI
-DJI<-DJItemp
-
-getSymbols("^DJI", src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
-DJIAtemp <- ROC(DJI)
-DJIA<-DJIAtemp
-DJI$DJIA.returns <- DJIA$DJI.Adjusted
+getSymbols("^GSPC",src = "yahoo", from = as.Date("2009-01-01"), to = as.Date("2019-12-31"))
+GSPC.ret <- ROC(GSPC)
+DJIA$GSPC.returns <- GSPC.ret$GSPC.Adjusted
 ```
 
 Sentiment Indicators
@@ -276,7 +270,7 @@ out.title <- with(
         date
     )
 )
-sentiment.ts <- xts(out$ave_sentiment, order.by=out.title$date)
+sentiment.ts <- xts(out.title$ave_sentiment, order.by=out.title$date)
 plot(sentiment.ts)
 #Now work on descriptions
 (out.desc <- with(
@@ -305,11 +299,11 @@ Syuzhet package
 
 Using stanford coreNLP (doesn't work, ignore for now)
 ```{r}
-volatiles = new.env(parent=emptyenv())
-tagger_path <- "C:\\Users\\Georges\\Desktop\\stanfordNLP"
-sentences.desc <- get_sentences(news.unclean$textDiv)
-stanford.annotate <- annotateString(sentences.desc)
-sentiment.stanford <- get_sentiment(sentences.desc, method="stanford", tagger_path)
+#volatiles = new.env(parent=emptyenv())
+#tagger_path <- "C:\\Users\\Georges\\Desktop\\stanfordNLP"
+#sentences.desc <- get_sentences(news.unclean$textDiv)
+#stanford.annotate <- annotateString(sentences.desc)
+#sentiment.stanford <- get_sentiment(sentences.desc, method="stanford", tagger_path)
 ```
 
 
@@ -325,62 +319,52 @@ news.sentiment.desc.HE <- aggregate(news.cleaned["desc.sentimentHE"], by=news.fu
 
 Match SentimentAnalysis to DJI dataset based on date
 ```{r}
-title.sa.LM <- rep(NA,nrow(DJI))
-title.sa.HE <- rep(NA,nrow(DJI))
-desc.sa.LM <- rep(NA,nrow(DJI))
-desc.sa.HE <- rep(NA,nrow(DJI))
+title.sa.LM <- rep(NA,nrow(DJIA))
+title.sa.HE <- rep(NA,nrow(DJIA))
+desc.sa.LM <- rep(NA,nrow(DJIA))
+desc.sa.HE <- rep(NA,nrow(DJIA))
 
 #Start with LM
-for(i in 1:nrow(DJI)){
-  if(any(as.Date.character(index(DJI)[i])==news.sentiment.title.LM$date)){
-         title.sa.LM[i] <- news.sentiment.title.LM$title.sentimentLM[which(as.Date.character(index(DJI)[i])==news.sentiment.title.LM$date)]
+for(i in 1:nrow(DJIA)){
+  if(any(as.Date.character(index(DJIA)[i])==news.sentiment.title.LM$date)){
+         title.sa.LM[i] <- news.sentiment.title.LM$title.sentimentLM[which(as.Date.character(index(DJIA)[i])==news.sentiment.title.LM$date)]
   }
-  if(any(as.Date.character(index(DJI)[i])==news.sentiment.desc.LM$date)){
-         desc.sa.LM[i] <- news.sentiment.desc.LM$desc.sentimentLM[which(as.Date.character(index(DJI)[i])==news.sentiment.desc.LM$date)]
+  if(any(as.Date.character(index(DJIA)[i])==news.sentiment.desc.LM$date)){
+         desc.sa.LM[i] <- news.sentiment.desc.LM$desc.sentimentLM[which(as.Date.character(index(DJIA)[i])==news.sentiment.desc.LM$date)]
   }
 }
-DJI$title.sa <- title.sa.LM
-DJI$desc.sa <- desc.sa.LM
+DJIA$title.sa <- title.sa.LM
+DJIA$desc.sa <- desc.sa.LM
 #now with HE
 for(i in 1:nrow(DJI)){
-  if(any(as.Date.character(index(DJI)[i])==news.sentiment.title.HE$date)){
-         title.sa.HE[i] <- news.sentiment.title.HE$title.sentimentHE[which(as.Date.character(index(DJI)[i])==news.sentiment.title.HE$date)]
+  if(any(as.Date.character(index(DJIA)[i])==news.sentiment.title.HE$date)){
+         title.sa.HE[i] <- news.sentiment.title.HE$title.sentimentHE[which(as.Date.character(index(DJIA)[i])==news.sentiment.title.HE$date)]
   }
-  if(any(as.Date.character(index(DJI)[i])==news.sentiment.desc.HE$date)){
-         desc.sa.HE[i] <- news.sentiment.desc.HE$desc.sentimentHE[which(as.Date.character(index(DJI)[i])==news.sentiment.desc.HE$date)]
+  if(any(as.Date.character(index(DJIA)[i])==news.sentiment.desc.HE$date)){
+         desc.sa.HE[i] <- news.sentiment.desc.HE$desc.sentimentHE[which(as.Date.character(index(DJIA)[i])==news.sentiment.desc.HE$date)]
   }
 }
-DJI$title.sa <- title.sa.HE
-DJI$desc.sa <- desc.sa.HE
+DJIA$title.sa <- title.sa.HE
+DJIA$desc.sa <- desc.sa.HE
 ```
 
 
 Implement sentiment from sentimentr into the dataset
 ```{r}
-title.sr <- rep(NA,nrow(DJI))
-desc.sr <- rep(NA,nrow(DJI))
+title.sr <- rep(NA,nrow(DJIA))
+desc.sr <- rep(NA,nrow(DJIA))
 
-for(i in 1:nrow(DJI)){
-  if(any(as.Date.character(index(DJI)[i])==out.title$date)){
-         title.sr[i] <- out.title$ave_sentiment[which(as.Date.character(index(DJI)[i])==out.title$date)]
+for(i in 1:nrow(DJIA)){
+  if(any(as.Date.character(index(DJIA)[i])==out.title$date)){
+         title.sr[i] <- out.title$ave_sentiment[which(as.Date.character(index(DJIA)[i])==out.title$date)]
   }
-  if(any(as.Date.character(index(DJI)[i])==out.desc$date)){
-         desc.sr[i] <- out.desc$ave_sentiment[which(as.Date.character(index(DJI)[i])==out.desc$date)]
+  if(any(as.Date.character(index(DJIA)[i])==out.desc$date)){
+         desc.sr[i] <- out.desc$ave_sentiment[which(as.Date.character(index(DJIA)[i])==out.desc$date)]
   }
   
 }
-DJI$title.sr <- title.sr
-DJI$desc.sr <- desc.sr
-```
-
-
-We have to offset our predictors as they are ordered time series. Hence, we aim to use predictors calculated at time t,to predict the direction at tme t+1.
-```{r}
-full.DJI <- DJI
-#lag predictors by 1 day
-for (i in 14:43){
-  DJI[,i] <- lag(DJI[,i],1)
-}
+DJIA$title.sr <- title.sr
+DJIA$desc.sr <- desc.sr
 ```
 
 
@@ -391,12 +375,38 @@ plot.zoo(DJI$diff, xlab = "Month", ylab = "First difference of adjusted returns"
 We can see that taking the first difference detrended the time series, and cetered it around zero. However, variance is still not constant, there is also clear signs of volatility clustering. However, we are focused on the direction of the time series, thus, the stationarity requirement is not as stringent. 
 
 
+There are huge gaps in the news dataset
+```{r}
+#We first create another dataset with all the sentiment scores from all methods
+keeps <- c("title.sa","desc.sa","title.sr","desc.sr")
+sentiment_scores<-DJIA[ , (names(DJIA) %in% keeps)]
+#Find the longest stretch
+stretch <- na.contiguous(sentiment_scores)
+```
+
+
+```{r}
+#We have to first preprocess the data, as there are huge gaps in the news dataset.
+#subset DJI (missing news before 2014-03-25)
+DJIA_full <- DJIA
+DJIA <- DJIA[1315:2767,]
+#convert to dataframe for methods that require it
+set.seed(123)
+DJIA.clean.df <- fortify.zoo(DJIA)
+DJIA.clean.df$direction <- factor(as.numeric(DJIA.clean.df$direction == 2))
+DJIA.clean.df <- DJIA.clean.df[,-1]
+levels(DJIA.clean.df$direction) <- c("down", "up")
+DJIA.clean.df$direction <- as.factor(DJIA.clean.df$direction)
+```
 
 We then perform a test for granger causality between the difference and our different fundamental and sentiment variables
 ```{r}
 #For DJIA with DJI
-grangertest(diff~DJIA.returns, order = 1, data=DJI)
-grangertest(DJIA.returns~diff, order = 1, data=DJI)
+grangertest(DJI.Close.returns~GSPC.returns, order = 1, data=DJIA.clean.df)
+grangertest(GSPC.returns~DJI.Close.returns, order = 1, data=DJIA.clean.df)
+#For sentiment with DJI
+grangertest(diff~GSPC.returns, order = 4, data=DJIA)
+grangertest(GSPC.returns~diff, order = 1, data=DJIA)
 ```
 It is evident that for sentiment scores constructed from headlines, the difference in prices granger causes sentiment.
 
@@ -408,24 +418,20 @@ grangertest(DJI_sentiment_desc~diff, order = 1, data=DJI)
 
 
 
-We cannot perform the usual resampling methods such as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
+
+We have to offset our predictors as they are ordered time series. Hence, we aim to use predictors calculated at time t,to predict the direction at time t+1.
 ```{r}
-#We have to first preprocess the data, as there are huge gaps in the news dataset.
-#subset DJI (missing news before 2014-03-25)
-DJI <- DJI[1315:2767,]
-#convert to dataframe for methods that require it
-set.seed(123)
-DJI.clean.df <- fortify.zoo(DJI)
-DJI.clean.df$direction <- factor(as.numeric(DJI.clean.df$direction == 2))
-rownames(DJI.clean.df) <- DJI.clean.df[,1]
-DJI.clean.df <- DJI.clean.df[,-1]
-levels(DJI.clean.df$direction) <- c("down", "up")
-DJI.clean.df$direction <- as.factor(DJI.clean.df$direction)
 #Remove all non-relevant variables from DJI
 drops <- c("DJI.Open","DJI.High","DJI.Low","DJI.Close","DJI.Volume","DJI.Adjusted","DJI.Open.returns","DJI.High.returns", "DJI.Low.returns","DJI.Close.returns", "DJI.Adjusted.returns", "diff")
 DJI.clean<-DJI.clean.df[ , !(names(DJI.clean.df) %in% drops)]
+#lag predictors by 1 day
+for (i in 14:43){
+  DJIA[,i] <- lag(DJIA[,i],1)
+}
 ```
 
+
+We cannot perform the usual resampling methods such as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
 
 The first dataset will be the full one with all variables included
 ```{r}
