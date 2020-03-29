@@ -188,15 +188,19 @@ Cleaning the dataset thoroughly for SentimentAnalysis package
 #clean the text itself from headlines
 news.cleaned <- news.full
 news.cleaned$Title <- tolower(news.cleaned$Title)
+news.cleaned$Title <- gsub("\\s*\\([^\\)]+\\)","",news.cleaned$Title)
 news.cleaned$Title <- gsub("global markets-", "",news.cleaned$Title)
-news.cleaned$Title <- gsub("rpt-", "",news.cleaned$Title)
+news.cleaned$Title <- gsub("rpt-", " ",news.cleaned$Title)
 news.cleaned$Title <- gsub("-", " ",news.cleaned$Title)
-news.cleaned$Title <- gsub("[[:punct:]]", " ", news.cleaned$Title)
+#news.cleaned$Title <- gsub("[[:punct:]]", " ", news.cleaned$Title)
+news.cleaned$Title <- sub("([&;])|[[:punct:]]", "\\1", news.cleaned$Title)
+news.cleaned$Title <- gsub("[*]", ".", news.cleaned$Title)
 #clean the text itself from description
 news.cleaned$textDiv <- tolower(news.cleaned$textDiv)
 news.cleaned$textDiv <- gsub("\\s*\\([^\\)]+\\)","",news.cleaned$textDiv)
 news.cleaned$textDiv <- gsub("-", " ",news.cleaned$textDiv)
 news.cleaned$textDiv <- gsub("[[:punct:]]", " ", news.cleaned$textDiv)
+news.cleaned$textDiv <- sub("([&;])|[[:punct:]]", "\\1", news.cleaned$textDiv)
 #crete alternate set wiitout stop words
 news.full.alt <- news.full
 stopWords <- stopwords("SMART")
@@ -233,9 +237,8 @@ news.unclean$textDiv <- gsub("[*]", ".", news.unclean$textDiv)
 Summary of data (fine-tune this)
 ```{r}
 #Wordcloud
-wordcloud(news.cleaned$Title,min.freq = 10,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 500)
-Title_clean.df <- as.character(news.cleaned.alt$Title_clean)
-wordcloud(Title_clean.df,min.freq = 10,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 500)
+wordcloud(news.cleaned$Title,min.freq = 100,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 1000)
+wordcloud(news.full.alt$Title,min.freq = 120,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 1000)
 ```
 
 Convert to sentiment (using SentimentAnalysis package)
@@ -255,7 +258,7 @@ news.cleaned <- cbind(news.cleaned, desc.sentimentLM, desc.sentimentHE)
 sentiment.alt <- analyzeSentiment(news.cleaned.alt$Title, language = "english", aggregate = news.cleaned.alt$date)
 title.sentimentLM.alt <- sentiment.alt$SentimentLM
 title.sentimentHE.alt <- sentiment.alt$SentimentHE
-news.cleaned.alt <- cbind(news.cleaned.alt, title.sentimentLM.alt, title.sentimentHE.alt)
+news.cleaned.alt <- cbind(news.full.alt, title.sentimentLM.alt, title.sentimentHE.alt)
 #for description as a sanity check
 sentiment2.alt <- analyzeSentiment(news.cleaned.alt$textDiv, language = "english", aggregate = news.cleaned.alt$date)
 desc.sentimentLM.alt <- sentiment2.alt$SentimentLM
@@ -557,25 +560,6 @@ coef(lasso.full$finalModel, lasso.full$bestTune$lambda)
 We obtain an accuracy of 57.39%, hwoever, the model only predicted up.
 The LASSO model chosen by cross validation only kept DJIA and fastK.
 
-zoo method (skip)
-```{r}
-lasso.alt <- train(direction ~ .,
-                    data = GSPC.train.alt,
-                    method = "glmnet",
-                    metric = "ROC",
-                    family = "binomial",
-                    preProcess = c("range"),
-                    trControl = myTimeControl,
-                    tuneGrid = lasso.grid)
-lasso.pred.alt <- predict(lasso.alt, GSPC.test.alt)
-confusionMatrix(lasso.pred.alt, GSPC.test.alt$direction)
-#inspect model
-lasso.alt
-plot(lasso.alt)
-#Find out which coefficients remained
-coef(lasso.full$finalModel, lasso.full$bestTune$lambda)
-```
-
 
 Lasso with technical (1) only
 ```{r}
@@ -688,8 +672,6 @@ Random Forest
 #a quick way to find a good value for mtry
 #bestMtry <- tuneRF(GSPC.train[,2:ncol(GSPC.train)], GSPC.train$direction, stepFactor = 1.5, improve = 1e-5, ntree = 1000)
 #Using caret to grid search
-mtry <- sqrt(ncol(GSPC.train))
-rfgrid <- expand.grid(.mtry=mtry)
 myGrid <- data.frame(mtry = c(2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30))
 rf.fit <- train(direction ~ .,
                     data = GSPC.train,
@@ -703,37 +685,6 @@ confusionMatrix(rf.test, GSPC.test$direction)
 rf.fit
 plot(rf.fit)
 ```
-
-```{r}
-#Alternatively
-modellist <- list()
-for (ntree in c(1000, 1500, 2000, 2500)) {
-	set.seed(123)
-	fit <- train(direction~., data=GSPC.train, method="rf", metric="ROC", tuneGrid=myGrid, trControl=myTimeControl, ntree=ntree)
-	key <- toString(ntree)
-	modellist[[key]] <- fit
-}
-results <- resamples(modellist)
-summary(results)
-dotplot(results)
-#Look at prediction accuracy
-#first model with ntree 1000
-rf.pred.1 <- predict(modellist$`1000`, GSPC.test)
-confusionMatrix(rf.pred.1, GSPC.test$direction)
-#second model with ntree 1500
-rf.pred.2 <- predict(modellist$`1500`, GSPC.test)
-confusionMatrix(rf.pred.2, GSPC.test$direction)
-#third model with ntree 2000
-rf.pred.3 <- predict(modellist$`2000`, GSPC.test)
-confusionMatrix(rf.pred.3, GSPC.test$direction)
-#fourth model with ntree 2500
-rf.pred.4 <- predict(modellist$`2500`, GSPC.test)
-confusionMatrix(rf.pred.4, GSPC.test$direction)
-plot(modellist$`2500`)
-#Variable importance
-varImp(modellist$`2500`)
-```
-Using this method results in an increased accuracy measure for the random forest method
 
 Now, run a randomforest with ntrees = 3000, and vary the predictors used
 ```{r}
@@ -817,4 +768,14 @@ svm.tune.1 <- train(direction~.,
 ```
 
 
+Neural net
+```{r}
+nnet.grid <- expand.grid(layer1 = 10, layer1 =20)
+nnet.fit <- train(direction ~ ., 
+                  data = GSPC.train,
+                  method = "mlpML",
+                  preProc = c("range"),
+                  maxit = 1000, 
+                  tuneGrid = nnet.grid) 
+```
 
