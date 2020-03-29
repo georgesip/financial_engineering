@@ -52,9 +52,8 @@ library(gbm)
 library(kernlab)
 library(e1071)
 library(devtools)
-install.packages("remotes")
 library(remotes)
-remotes::install_github("trinker/sentimentr")
+#remotes::install_github("trinker/sentimentr")
 library(sentimentr)
 library(tidyverse)
 library(tm)
@@ -202,16 +201,16 @@ news.cleaned$textDiv <- gsub("-", " ",news.cleaned$textDiv)
 news.cleaned$textDiv <- gsub("[[:punct:]]", " ", news.cleaned$textDiv)
 news.cleaned$textDiv <- sub("([&;])|[[:punct:]]", "\\1", news.cleaned$textDiv)
 #crete alternate set wiitout stop words
-news.full.alt <- news.full
+news.cleaned.alt <- news.full
 stopWords <- stopwords("SMART")
-news.full.alt$Title<- as.character(news.full.alt$Title) 
+news.cleaned.alt$Title<- as.character(news.cleaned.alt$Title) 
 '%nin%' <- Negate('%in%')
-news.full.alt$Title_clean<-lapply(news.full.alt$Title, function(x) {
+news.cleaned.alt$Title_clean<-lapply(news.cleaned.alt$Title, function(x) {
   chk <- unlist(strsplit(x," "))
   p <- chk[chk %nin% stopWords]
   paste(p,collapse = " ")
 })
-news.full.alt$desc_clean<-lapply(news.full.alt$textDiv, function(x) {
+news.cleaned.alt$desc_clean<-lapply(news.cleaned.alt$textDiv, function(x) {
   chk <- unlist(strsplit(x," "))
   p <- chk[chk %nin% stopWords]
   paste(p,collapse = " ")
@@ -533,6 +532,29 @@ myTimeControl <- trainControl(method = "timeslice",
                               classProbs = TRUE, 
                               summaryFunction = twoClassSummary,
                               allowParallel = TRUE)
+```
+
+
+Document term matrix
+```{r}
+#create alternate news source
+#news.alt <- news.cleaned
+
+#
+#news.tibble <- as_tibble(news.cleaned)
+#(news_tokens <- news.tibble %>%
+   #unnest_tokens(output = word, input = Title) %>%
+   # remove numbers
+   #filter(!str_detect(word, "^[0-9]*$")) %>%
+   # remove stop words
+   #anti_join(stop_words) %>%
+   # stem the words
+   #mutate(word = SnowballC::wordStem(word)))
+
+#news_dtm <- news_tokens %>%
+  #count(date, word) %>%
+  #cast_dtm(document = date, term = word, value = n)
+#removeSparseTerms(news_dtm, sparse = .99)
 ```
 
 
