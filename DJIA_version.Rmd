@@ -52,9 +52,8 @@ library(gbm)
 library(kernlab)
 library(e1071)
 library(devtools)
-install.packages("remotes")
 library(remotes)
-remotes::install_github("trinker/sentimentr")
+#remotes::install_github("trinker/sentimentr")
 library(sentimentr)
 library(tidyverse)
 library(tm)
@@ -62,6 +61,7 @@ library(rJava)
 library(coreNLP)
 library(syuzhet)
 library(qdap)
+library(DMwR)
 ```
 
 Main stock dataset
@@ -82,7 +82,7 @@ DJIA<-merge(DJIA,returns.data,join='left')
 DJIA$diff <- DJIA$DJI.Close - Lag(DJIA$DJI.Close)
 #Convert difference into output vector
 DJIA$direction <- ifelse(DJIA$diff  > 0, 1, 0)
-DJIA$direction<-as.factor(DJIA$direction)
+#DJIA$direction <- as.factor(DJIA$direction)
 ```
 
 Technical Indicators (1)
@@ -99,6 +99,9 @@ DJIA$momentum <- momentum
 DJIA$stochastic.k <- stoch(DJIA[,c("DJI.High","DJI.Low", "DJI.Adjusted")], nFastK = 14, bounded = TRUE)*100
 #Implement stochastic D%, which is the 3-day mooving average of K%
 DJIA$stochastic.d <- stoch(DJIA[,c("DJI.High","DJI.Low", "DJI.Adjusted")],  nFastD = 3, bounded = TRUE)*100
+#This duplicates fast d and fast k, so let's remove those
+drops <- c("fastK.1", "fastD.1")
+DJIA<-DJIA[ , !(names(DJIA) %in% drops)]
 #Implement RSI, the relative strength index. RSI is a measure of ratio of the recent upward price movements to the absolute price movement
 #We will use n=14 for now
 DJIA$RSI <- RSI(DJIA$DJI.Adjusted, n = 14)
@@ -273,13 +276,13 @@ out.title <- with(
 sentiment.ts <- xts(out.title$ave_sentiment, order.by=out.title$date)
 plot(sentiment.ts)
 #Now work on descriptions
-(out.desc <- with(
+out.desc <- with(
     news.unclean, 
     sentiment_by(
         get_sentences(textDiv), 
         date
     )
-))
+)
 sentiment.desc.ts <- xts(out.desc$ave_sentiment, order.by=out.desc$date)
 plot(sentiment.desc.ts)
 #Another possible plot
@@ -287,24 +290,15 @@ highlight(out.title)
 highlight(out.desc)
 ```
 
-
-Syuzhet package
+Now try adding the removed stopwords version to the model
 ```{r}
-#Another option is the syuzhet package
-
-#Using Stanford coreNLP in syuzhet
+news.sentiment.title.LM.alt <- aggregate(news.cleaned.alt["title.sentimentLM.alt"], by=news.full["date"], mean)
+news.sentiment.desc.LM.alt <- aggregate(news.cleaned.alt["desc.sentimentLM.alt"], by=news.full["date"], mean)
+news.sentiment.title.HE.alt <- aggregate(news.cleaned.alt["title.sentimentHE.alt"], by=news.full["date"], mean)
+news.sentiment.desc.HE.alt <- aggregate(news.cleaned.alt["desc.sentimentHE.alt"], by=news.full["date"], mean)
 
 ```
-
-
-Using stanford coreNLP (doesn't work, ignore for now)
-```{r}
-#volatiles = new.env(parent=emptyenv())
-#tagger_path <- "C:\\Users\\Georges\\Desktop\\stanfordNLP"
-#sentences.desc <- get_sentences(news.unclean$textDiv)
-#stanford.annotate <- annotateString(sentences.desc)
-#sentiment.stanford <- get_sentiment(sentences.desc, method="stanford", tagger_path)
-```
+The non LD dictionary method has higher correlation weirdly
 
 
 Integrate sentiment data with DJI (SentimentAnalysis)
@@ -314,6 +308,28 @@ news.sentiment.title.LM <- aggregate(news.cleaned["title.sentimentLM"], by=news.
 news.sentiment.desc.LM <- aggregate(news.cleaned["desc.sentimentLM"], by=news.full["date"], mean)
 news.sentiment.title.HE <- aggregate(news.cleaned["title.sentimentHE"], by=news.full["date"], mean)
 news.sentiment.desc.HE <- aggregate(news.cleaned["desc.sentimentHE"], by=news.full["date"], mean)
+DJIA.alt <- DJIA
+for(i in 1:nrow(DJIA.alt)){
+  if(any(as.Date.character(index(DJIA.alt)[i])==news.sentiment.title.LM$date)){
+         title.sa.LM[i] <- news.sentiment.title.LM$title.sentimentLM[which(as.Date.character(index(DJIA.alt)[i])==news.sentiment.title.LM$date)]
+  }
+  if(any(as.Date.character(index(DJIA.alt)[i])==news.sentiment.desc.LM$date)){
+         desc.sa.LM[i] <- news.sentiment.desc.LM$desc.sentimentLM[which(as.Date.character(index(DJIA.alt)[i])==news.sentiment.desc.LM$date)]
+  }
+}
+DJIA.alt$title.sa.LM <- title.sa.LM
+DJIA.alt$desc.sa.LM <- desc.sa.LM
+#now with HE
+for(i in 1:nrow(DJI)){
+  if(any(as.Date.character(index(DJIA.alt)[i])==news.sentiment.title.HE$date)){
+         title.sa.HE[i] <- news.sentiment.title.HE$title.sentimentHE[which(as.Date.character(index(DJIA.alt)[i])==news.sentiment.title.HE$date)]
+  }
+  if(any(as.Date.character(index(DJIA.alt)[i])==news.sentiment.desc.HE$date)){
+         desc.sa.HE[i] <- news.sentiment.desc.HE$desc.sentimentHE[which(as.Date.character(index(DJIA.alt)[i])==news.sentiment.desc.HE$date)]
+  }
+}
+DJIA.alt$title.sa.HE <- title.sa.HE
+DJIA.alt$desc.sa.HE <- desc.sa.HE
 ```
 
 
@@ -333,8 +349,8 @@ for(i in 1:nrow(DJIA)){
          desc.sa.LM[i] <- news.sentiment.desc.LM$desc.sentimentLM[which(as.Date.character(index(DJIA)[i])==news.sentiment.desc.LM$date)]
   }
 }
-DJIA$title.sa <- title.sa.LM
-DJIA$desc.sa <- desc.sa.LM
+DJIA$title.sa.LM <- title.sa.LM
+DJIA$desc.sa.LM <- desc.sa.LM
 #now with HE
 for(i in 1:nrow(DJI)){
   if(any(as.Date.character(index(DJIA)[i])==news.sentiment.title.HE$date)){
@@ -344,8 +360,8 @@ for(i in 1:nrow(DJI)){
          desc.sa.HE[i] <- news.sentiment.desc.HE$desc.sentimentHE[which(as.Date.character(index(DJIA)[i])==news.sentiment.desc.HE$date)]
   }
 }
-DJIA$title.sa <- title.sa.HE
-DJIA$desc.sa <- desc.sa.HE
+DJIA$title.sa.HE <- title.sa.HE
+DJIA$desc.sa.HE <- desc.sa.HE
 ```
 
 
@@ -370,7 +386,7 @@ DJIA$desc.sr <- desc.sr
 
 We now look at plots of the data
 ```{r}
-plot.zoo(DJI$diff, xlab = "Month", ylab = "First difference of adjusted returns", col = 'blue', lwd = 0.5)
+plot.zoo(DJIA$diff, xlab = "Month", ylab = "First difference of adjusted returns", col = 'blue', lwd = 0.5)
 ```
 We can see that taking the first difference detrended the time series, and cetered it around zero. However, variance is still not constant, there is also clear signs of volatility clustering. However, we are focused on the direction of the time series, thus, the stationarity requirement is not as stringent. 
 
@@ -382,31 +398,78 @@ keeps <- c("title.sa","desc.sa","title.sr","desc.sr")
 sentiment_scores<-DJIA[ , (names(DJIA) %in% keeps)]
 #Find the longest stretch
 stretch <- na.contiguous(sentiment_scores)
-```
-
-
-```{r}
-#We have to first preprocess the data, as there are huge gaps in the news dataset.
-#subset DJI (missing news before 2014-03-25)
+#subset GSPC (missing news before 2014-03-25)
 DJIA_full <- DJIA
 DJIA <- DJIA[1315:2767,]
-#convert to dataframe for methods that require it
-set.seed(123)
-DJIA.clean.df <- fortify.zoo(DJIA)
-DJIA.clean.df$direction <- factor(as.numeric(DJIA.clean.df$direction == 2))
-DJIA.clean.df <- DJIA.clean.df[,-1]
-levels(DJIA.clean.df$direction) <- c("down", "up")
-DJIA.clean.df$direction <- as.factor(DJIA.clean.df$direction)
+#There are still some NA's in USCHEX, we can do some imputation
+colSums(is.na(DJIA))
+DJIA <- na_locf(DJIA)
 ```
+
+
+We have to offset our predictors as they are ordered time series. Hence, we aim to use predictors calculated at time t,to predict the direction at time t+1.
+```{r}
+#Remove non-relevant variables
+DJIA.plot <- DJIA
+drops <- c("DJI.Open","DJI.High","DJI.Low","DJI.Close","DJI.Volume","DJI.Adjusted","DJI.Open.returns","DJI.High.returns", "DJI.Low.returns","DJI.Close.returns", "DJI.Adjusted.returns", "diff")
+DJIA<-DJIA[ , !(names(DJIA) %in% drops)]
+#lag predictors by 1 day
+test.case <- DJIA
+for (i in 2:31){
+  DJIA[,i] <- lag(DJIA[,i],1)
+}
+#Remove the first observation as we now have one row of NA's
+DJIA <- DJIA[-1,]
+
+#For the plotting dataframe
+for (i in 14:43){
+  DJIA.plot[,i] <- lag(DJIA.plot[,i],1)
+}
+#Remove the first observation as we now have one row of NA's
+DJIA.plot <- DJIA.plot[-1,]
+```
+
+```{r}
+#convert to dataframe for methods that require it
+DJIA.df <- fortify.zoo(DJIA)
+DJIA.df$direction <- as.factor(DJIA.df$direction)
+levels(DJIA.df$direction) <- c("down", "up")
+#scale the dataframe to [-1,1]
+DJIA.scaled <- DJIA.df
+DJIA.scaled$Index <- NULL
+for (i in 2:31){
+  DJIA.scaled[,i] <- LinearScaling(DJIA.scaled[,i])
+}
+```
+
+Coorelation matrix
+```{r}
+#Time series
+#First, add back in the difference 
+plot.zoo(DJIA.plot$diff, xlab = "Month", ylab = "First difference of adjusted returns", col = 'blue', lwd = 0.5)
+#Correlation heatmap
+corr.df <- subset(DJIA.plot, select = -c(DJI.Open,DJI.High,DJI.Low,DJI.Close,DJI.Volume,DJI.Adjusted,DJI.Open.returns,DJI.High.returns, DJI.Low.returns,DJI.Close.returns,DJI.Adjusted.returns))
+corr <- round(cor(corr.df),1)
+library(ggcorrplot)
+ggcorrplot(corr, tl.cex = 3)
+```
+
 
 We then perform a test for granger causality between the difference and our different fundamental and sentiment variables
 ```{r}
 #For DJIA with DJI
-grangertest(DJI.Close.returns~GSPC.returns, order = 1, data=DJIA.clean.df)
-grangertest(GSPC.returns~DJI.Close.returns, order = 1, data=DJIA.clean.df)
+keeps <- c("DJI.Close.returns","GSPC.returns")
+DJIA.granger.1 <-DJIA_full[ ,(names(DJIA_full) %in% keeps)]
+DJIA.granger.1 <- DJIA.granger.1[-1,]
+VARselect(DJIA.granger.1, lag.max = 7)
+grangertest(DJI.Close.returns~GSPC.returns, order = 1, data=DJIA_full)
+grangertest(GSPC.returns~DJI.Close.returns, order = 2, data=DJIA_full)
 #For sentiment with DJI
-grangertest(diff~GSPC.returns, order = 4, data=DJIA)
-grangertest(GSPC.returns~diff, order = 1, data=DJIA)
+grangertest(diff~GSPC.returns, order = 4, data=DJIA_full)
+grangertest(GSPC.returns~diff, order = 1, data=DJIA.plot)
+#plot
+plot(DJIA.plot$DJI.Close.returns)
+lines(DJIA.plot$GSPC.returns, col = "red")
 ```
 It is evident that for sentiment scores constructed from headlines, the difference in prices granger causes sentiment.
 
@@ -417,78 +480,52 @@ grangertest(DJI_sentiment_desc~diff, order = 1, data=DJI)
 ```
 
 
-
-
-We have to offset our predictors as they are ordered time series. Hence, we aim to use predictors calculated at time t,to predict the direction at time t+1.
-```{r}
-#Remove all non-relevant variables from DJI
-drops <- c("DJI.Open","DJI.High","DJI.Low","DJI.Close","DJI.Volume","DJI.Adjusted","DJI.Open.returns","DJI.High.returns", "DJI.Low.returns","DJI.Close.returns", "DJI.Adjusted.returns", "diff")
-DJI.clean<-DJI.clean.df[ , !(names(DJI.clean.df) %in% drops)]
-#lag predictors by 1 day
-for (i in 14:43){
-  DJIA[,i] <- lag(DJIA[,i],1)
-}
-```
-
-
-We cannot perform the usual resampling methods such as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
-
 The first dataset will be the full one with all variables included
 ```{r}
 #Assess the number of NA's
-colSums(is.na(DJI.clean))
-#There are still some NA's in USCHEX, we can do some imputation
-DJI.clean <- na.locf(DJI.clean)
+colSums(is.na(DJIA.scaled))
 #Split into training and test set
-DJI.end <- floor(0.8*nrow(DJI.clean)) #select the first 80% of the data
-DJI.train <- DJI.clean[1:DJI.end,] #assign the first 80% of the data to the train set
-DJI.test <- DJI.clean[(DJI.end+1):nrow(DJI.clean),]
+DJIA.end <- floor(0.9*nrow(DJIA.scaled)) #select the first 90% of the data
+DJIA.train <- DJIA.scaled[1:DJIA.end,] #assign the first 90% of the data to the train set
+DJIA.test <- DJIA.scaled[(DJIA.end+1):nrow(DJIA.scaled),]
 ```
 
 
 Create dataset for technical indicators (1) only, without sentiment and fundamentals
 ```{r}
-DJI.1 <- DJI.clean
-drops1 <- c("OBV", "SMA5","BIAS6","PSY12","ASY1", "ASY2","ASY3","ASY4","ASY5","USCHEX","DJIA.returns", "DJI_sentiment_desc")
-DJI.1<-DJI.1[ , !(names(DJI.1) %in% drops3)]
+DJIA.t1 <- DJIA.scaled
+keepst1 <- c("direction","SMA10", "WMA10","momentum","fastK","fastD", "stochastic.k","stochastic.d","RSI","macd","Williams.R","Williams.AD", "CCI", "USCHEX", "GSPC.returns", "title.sa.LM", "desc.sa.LM", "title.sa.HE", "desc.sa.HE", "title.sr", "desc.sr")
+DJIA.t1<-DJIA.t1[ , (names(DJIA.t1) %in% keepst1)]
 #Split into training and test set
-DJI.train.1 <- DJI.1[1:DJI.end,] #assign the first 80% of the data to the train set
-DJI.test.1 <- DJI.1[(DJI.end+1):nrow(DJI.1),]
+DJIA.train.t1 <- DJIA.t1[1:DJIA.end,] #assign the first 80% of the data to the train set
+DJIA.test.t1 <- DJIA.t1[(DJIA.end+1):nrow(DJIA.t1),]
 ```
 
 
 
-Create dataset for technical indicators (2) only, without sentiment and fundamentals
+Create dataset for technical indicators (2), with sentiment and fundamentals
 ```{r}
-DJI.2 <- DJI.clean
-drops2 <- c("SMA10", "WMA10","momentum","fastK","fastD","stochastic.k","fastK.1","fastD.1","stochastic.d","RSI"      ,"macd","MACD","Williams.R","Williams.AD","CCI","USCHEX","DJIA.returns","DJI_sentiment_title", "DJI_sentiment_desc")
-DJI.2<-DJI.2[ , !(names(DJI.2) %in% drops2)]
+DJIA.t2 <- DJIA.scaled
+keepst2 <- c("SMA10", "WMA10","momentum","fastK","fastD", "stochastic.k","stochastic.d","RSI","macd","Williams.R","Williams.AD", "CCI")
+DJIA.t2<-DJIA.t2[ , !(names(DJIA.t2) %in% keepst2)]
 #Split into training and test set
-DJI.train.2 <- DJI.2[1:DJI.end,] #assign the first 80% of the data to the train set
-DJI.test.2 <- DJI.2[(DJI.end+1):nrow(DJI.2),]
+DJIA.train.t2 <- DJIA.t2[1:DJIA.end,] #assign the first 80% of the data to the train set
+DJIA.test.t2 <- DJIA.t2[(DJIA.end+1):nrow(DJIA.t2),]
 ```
 
 
 Create dataset with fundamentals only
 ```{r}
-DJI.f <- DJI.clean
-dropsf <- c("SMA10", "WMA10","momentum","fastK","fastD","stochastic.k","fastK.1","fastD.1","stochastic.d","RSI"      ,"macd","MACD","Williams.R","Williams.AD","CCI","OBV", "SMA5","BIAS6","PSY12","ASY1", "ASY2","ASY3","ASY4","ASY5","DJI_sentiment_title", "DJI_sentiment_desc")
-DJI.f<-DJI.f[ , !(names(DJI.f) %in% dropsf)]
-#Split into training and test set
-DJI.train.f <- DJI.f[1:DJI.end,] #assign the first 80% of the data to the train set
-DJI.test.f <- DJI.2[(DJI.end+1):nrow(DJI.f),]
+
 ```
 
 Create dataset with only sentiment
 ```{r}
-DJI.s <- DJI.clean
-dropss <- c("DJI_sentiment_title", "DJI_sentiment_desc")
-DJI.s<-DJI.s[ , !(names(DJI.s) %in% dropss)]
-#Split into training and test set
-DJI.train.s <- DJI.s[1:DJI.end,] #assign the first 80% of the data to the train set
-DJI.test.s <- DJI.s[(DJI.end+1):nrow(DJI.s),]
+
 ```
 
+
+We cannot perform the usual resampling methods such as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
 
 Prepare for caret library
 ```{r}
@@ -496,31 +533,33 @@ set.seed(1)
 #prepare parallel computing method
 registerDoParallel(cores=6)
 myTimeControl <- trainControl(method = "timeslice",
-                              initialWindow = 32,
-                              horizon = 2,
-                              fixedWindow = FALSE,
-                              classProbs = TRUE, 
-                              summaryFunction = twoClassSummary,
-                              allowParallel = TRUE)
+                              initialWindow = 200,
+                              horizon = 10,
+                              fixedWindow = TRUE,
+                              #classProbs = TRUE, 
+                              #summaryFunction = twoClassSummary,
+                              allowParallel = TRUE,
+                              savePredictions = "all")
 ```
 
 
 LASSO/RIDGE with technicals (1), fundamentals, and sentiment desc
 ```{r}
 #optimise using AIC and BIC
-
+#Drop the index
+DJIA.train$Index <- NULL
 lasso.grid <- expand.grid(lambda=seq(0,1,by=0.05),alpha=1)
 lasso.fit <- train(direction ~ .,
-                    data = DJI.train,
+                    data = DJIA.train,
                     method = "glmnet",
-                    metric = "ROC",
+                    metric = "Accuracy",
                     family = "binomial",
-                    preProcess = c("range"),
+                    #preProcess = c("range"),
                     trControl = myTimeControl,
                     tuneGrid = lasso.grid)
-lasso.pred <- predict(lasso.fit, DJI.test)
-confusionMatrix(lasso.pred, DJI.test$direction)
-mean(lasso.pred == DJI.test$direction)                    
+lasso.pred <- predict(lasso.fit, DJIA.test)
+confusionMatrix(lasso.pred, DJIA.test$direction)
+mean(lasso.pred == DJIA.test$direction) 
 ```
 We obtain an accuracy of only 46.7%
 
@@ -528,32 +567,33 @@ We obtain an accuracy of only 46.7%
 Lasso with technical (1) only
 
 ```{r}
+lasso.grid1 <- expand.grid(lambda=seq(0,0.2,by=0.01),alpha=1)
 lasso.fit1 <- train(direction ~ .,
-                    data = DJI.train1,
+                    data = DJIA.train.t1,
                     method = "glmnet",
-                    metric = "ROC",
+                    metric = "Accuracy",
                     family = "binomial",
-                    preProcess = c("range"),
+                    #preProcess = c("range"),
                     trControl = myTimeControl,
-                    tuneGrid = lasso.grid)
-lasso.pred2 <- predict(lasso.fit1, DJI.test1)
-confusionMatrix(lasso.pred2, DJI.test2$direction)
+                    tuneGrid = lasso.grid1)
+lasso.pred1 <- predict(lasso.fit1, DJIA.test.t1)
+confusionMatrix(lasso.pred1, DJIA.test.t1$direction)
 ```
 We obtain an accuracy of 49.48%
 
-
 Lasso with technical (2) only
 ```{r}
+lasso.grid2 <- expand.grid(lambda=seq(0,0.8,by=0.05),alpha=1)
 lasso.fit2 <- train(direction ~ .,
-                    data = DJI.train2,
+                    data = DJIA.train.t2,
                     method = "glmnet",
-                    metric = "ROC",
+                    metric = "Accuracy",
                     family = "binomial",
-                    preProcess = c("range"),
+                    #preProcess = c("range"),
                     trControl = myTimeControl,
-                    tuneGrid = lasso.grid)
-lasso.pred2 <- predict(lasso.fit2, DJI.test2)
-confusionMatrix(lasso.pred2, DJI.test2$direction)
+                    tuneGrid = lasso.grid2)
+lasso.pred2 <- predict(lasso.fit2, DJIA.test.t2)
+confusionMatrix(lasso.pred2, DJIA.test.t2$direction)
 mean(lasso.pred2 == DJI.test2$direction)    
 ```
 We obtain an accuracy of 57.39%
@@ -589,13 +629,6 @@ Random Forest
 #a quick way to find a good value for mtry
 #bestMtry <- tuneRF(DJI.train[,2:ncol(DJI.train)], DJI.train$direction, stepFactor = 1.5, improve = 1e-5, ntree = 1000)
 #Using caret to grid search
-rf.control <-trainControl(method = "timeslice",
-                              initialWindow = 32,
-                              horizon = 12,
-                              fixedWindow = FALSE,
-                              number = 10,
-                              classProbs = TRUE, 
-                              allowParallel = TRUE)
 mtry <- sqrt(ncol(DJI.train))
 rfgrid <- expand.grid(.mtry=mtry)
 rf.fit <- train(direction ~ .,
@@ -642,47 +675,157 @@ SVM
 ```{r}
 #First we find the optimal tuning parameter
 svm.tune <- train(direction~.,
-                  data = DJI.train,
+                  data = DJIA.train,
                   method = "svmRadial",   # Radial kernel
                   tuneLength = 9,					# 9 values of the cost function
-                  preProc = c("range"),  # Center and scale data
-                  metric="ROC",
+                  #preProc = c("range"),  # Center and scale data
+                  #metric="Accuracy",
                   trControl=myTimeControl)
 svm.tune
+svm.test <- predict(svm.tune, newdata = DJIA.test)
+confusionMatrix(svm.test, DJIA.test$direction)
 #we narrow the grid search
-svm.grid <- expand.grid(sigma = c(.040, .036, 0.030), C = c(0.25, 0.2, 0.35))
+svm.grid <- expand.grid(sigma = c(0.25, .026, 0.027), C = c(7, 8, 9))
 svm.tune2 <- train(direction~.,
-                  data = DJI.train,
+                  data = DJIA.train,
                   method = "svmRadial",   # Radial kernel
                   tuneGrid = svm.grid,					# 9 values of the cost function
-                  preProc = c("range"),  # Center and scale data
-                  metric="ROC",
                   trControl=myTimeControl)
-svm.test <- predict(svm.tune, newdata = DJI.test)
-confusionMatrix(svm.test, DJI.test$direction)
+svm.test2 <- predict(svm.tune2, newdata = DJIA.test)
+confusionMatrix(svm.test, DJIA.test$direction)
 ```
-Using technical indicators 2
+Using technical indicators 1
 ```{r}
 svm.tune3 <- train(direction~.,
-                  data = DJI.train2,
+                  data = DJIA.train.t1,
                   method = "svmRadial",   # Radial kernel
                   tuneLength = 9,					# 9 values of the cost function
-                  preProc = c("range"),  # Center and scale data
-                  metric="ROC",
                   trControl=myTimeControl)
-svm.tune2
+svm.tune3
+svm.test <- predict(svm.tune3, newdata = DJIA.test.t1)
+confusionMatrix(svm.test, DJIA.test.t1$direction, positive = "up")
+varImp(svm.tune3)
 #we narrow the grid search
-svm.grid <- expand.grid(sigma = c(.040, .036, 0.030), C = c(0.25, 0.2, 0.35))
-svm.tune4 <- train(direction~.,
-                  data = DJI.train2,
+svm.grid.t1 <- expand.grid(sigma = c(.040, .035, 0.045), C = c(12, 16, 20))
+svm.t1 <- train(direction~.,
+                  data = DJIA.train.t1,
                   method = "svmRadial",   # Radial kernel
-                  tuneGrid = svm.grid,					# 9 values of the cost function
-                  preProc = c("range"),  # Center and scale data
-                  metric="ROC",
+                  tuneGrid = svm.grid.t1,					# 9 values of the cost function
                   trControl=myTimeControl)
-svm.test3 <- predict(svm.tune2, newdata = DJI.test2)
-confusionMatrix(svm.test3, DJI.test2$direction)
+svm.test.t1 <- predict(svm.t1, newdata = DJIA.test.t1)
+confusionMatrix(svm.test.t1, DJIA.test.t1$direction)
+```
+
+SVM with technicals 2
+```{r}
+svm.tune4 <- train(direction~.,
+                  data = DJIA.train.t2,
+                  method = "svmRadial",   # Radial kernel
+                  tuneLength = 9,					# 9 values of the cost function
+                  trControl=myTimeControl)
+svm.tune4
+svm.test <- predict(svm.tune4, newdata = DJIA.test.t2)
+confusionMatrix(svm.test, DJIA.test.t2$direction, positive = "up")
+varImp(svm.tune4)
+#we narrow the grid search
+svm.grid.t2 <- expand.grid(sigma = c(.040, .035, 0.045), C = c(0.5, 0.25, 0.75))
+svm.t2 <- train(direction~.,
+                  data = DJIA.train.t2,
+                  method = "svmRadial",   # Radial kernel
+                  tuneGrid = svm.grid.t2,					# 9 values of the cost function
+                  trControl=myTimeControl)
+svm.test.t2 <- predict(svm.t2, newdata = DJIA.test.t2)
+confusionMatrix(svm.test.t2, DJIA.test.t2$direction)
+```
+
+Random Forest
+```{r}
+rfGrid <- data.frame(mtry = c(4, 5, 6, 7, 8, 9, 10, 20, 31))
+rf.fit <- train(direction ~ .,
+                    data = DJIA.train,
+                    method = "rf",
+                    trControl = myTimeControl,
+                    tuneGrid = rfGrid)
+rf.fit
+rfGrid <- data.frame(mtry = c(3:6))
+rf.fit.1 <- train(direction ~ .,
+                    data = DJIA.train,
+                    method = "rf",
+                    trControl = myTimeControl,
+                    tuneGrid = rfGrid)
+rf.fit.1$finalModel
+varImp(rf.fit.1)
+rf.test <- predict(rf.fit.1, newdata = DJIA.test)
+confusionMatrix(rf.test, DJIA.test$direction)
+```
+
+Random Forest with t1
+```{r}
+rfGrid.t1 <- data.frame(mtry = c(4, 5, 6, 7, 8, 9, 10, 20, 31))
+rf.tune.t1 <- train(direction ~ .,
+                    data = DJIA.train.t1,
+                    method = "rf",
+                    trControl = myTimeControl,
+                    ntree = 3000,
+                    tuneGrid = rfGrid)
+rf.test.t1 <- predict(rf.tune.t1, newdata = DJIA.test.t1)
+confusionMatrix(rf.test.t1, DJIA.test.t1$direction)
+rfGrid.t1 <- data.frame(mtry = c(2:13))
+rf.t1 <- train(direction ~ .,
+                    data = DJIA.train.t1,
+                    method = "rf",
+                    trControl = myTimeControl,
+                    ntree = 3000,
+                    tuneGrid = rfGrid)
+rf.test.t1 <- predict(rf.t1, newdata = DJIA.test.t1)
+confusionMatrix(rf.test.t1, DJIA.test.t1$direction)
+```
+
+Random forest with t2
+```{r}
+rfGrid.t2 <- data.frame(mtry = c(4, 5, 6, 7, 8, 9, 10, 20, 31))
+rf.tune.t2 <- train(direction ~ .,
+                    data = DJIA.train.t2,
+                    method = "rf",
+                    trControl = myTimeControl,
+                    ntree = 3000,
+                    tuneGrid = rfGrid)
+rf.test.t2 <- predict(rf.tune.t2, newdata = DJIA.test.t2)
+confusionMatrix(rf.test.t2, DJIA.test.t2$direction)
+rfGrid.t2 <- data.frame(mtry = c(2:13))
+rf.t2 <- train(direction ~ .,
+                    data = DJIA.train.t2,
+                    method = "rf",
+                    trControl = myTimeControl,
+                    ntree = 3000,
+                    tuneGrid = rfGrid)
+rf.test.t2 <- predict(rf.t2, newdata = DJIA.test.t2)
+confusionMatrix(rf.test.t2, DJIA.test.t2$direction)
 ```
 
 
+Neural net (full)
+```{r}
+nnet.grid <- expand.grid(.decay = c(0.5, 0.1), .size = c(5, 6, 7))
+nnet.fit <- train(DJIA.train[,-1], 
+                  DJIA.train$direction,
+                  method = "nnet",
+                  maxit = 1000, 
+                  tuneGrid = nnet.grid) 
+nnet.pred <- predict(nnet.fit, DJIA.test)
+confusionMatrix(nnet.pred, DJIA.test$direction)
+#alternate method
+mlp.grid <- expand.grid(layer1 = 10, layer2=10, layer3=10)
+nnet.fit2 <- train(x=DJIA.train[,-1], 
+                  y=DJIA.train$direction,
+                  method = "mlpML",
+                  tuneGrid = mlp.grid) 
+nnet.pred.2 <- predict(nnet.fit2, DJIA.test)
+confusionMatrix(nnet.pred.2, DJIA.test$direction)
+```
+
+Neural net with t1
+```{r}
+
+```
 

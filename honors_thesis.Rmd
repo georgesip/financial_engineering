@@ -62,6 +62,8 @@ library(coreNLP)
 library(syuzhet)
 library(qdap)
 library(caretEnsemble)
+library(DMwR)
+library(quanteda)
 ```
 
 Main stock dataset
@@ -101,6 +103,8 @@ GSPC$momentum <- momentum
 GSPC$stochastic.k <- stoch(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Adjusted")], nFastK = 14, bounded = TRUE)*100
 #Implement stochastic D%, which is the 3-day mooving average of K%
 GSPC$stochastic.d <- stoch(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Adjusted")],  nFastD = 3, bounded = TRUE)*100
+drops <- c("fastK.1", "fastD.1")
+GSPC<-GSPC[ , !(names(GSPC) %in% drops)]
 #Implement RSI, the relative strength index. RSI is a measure of ratio of the recent upward price movements to the absolute price movement
 #We will use n=14 for now
 GSPC$RSI <- RSI(GSPC$GSPC.Adjusted, n = 14)
@@ -116,7 +120,6 @@ GSPC$CCI <- CCI(GSPC[,c("GSPC.High","GSPC.Low", "GSPC.Close")], n = 3, maType = 
 
 Technical Indicators (2)
 ```{r}
-
 #Implement OBV, On Balance Volume. OBV is a momentum indicator that tracks changes in volume traded as well as price. 
 GSPC$OBV <- OBV(GSPC[,"GSPC.Close"], GSPC[,"GSPC.Volume"])
 #Implement a 5 period simple moving average
@@ -237,7 +240,7 @@ Summary of data (fine-tune this)
 ```{r}
 #Wordcloud
 wordcloud(news.cleaned$Title,min.freq = 100,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 1000)
-wordcloud(news.full.alt$Title,min.freq = 120,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 1000)
+wordcloud(news.cleaned.alt$Title,min.freq = 120,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 1000)
 ```
 
 Convert to sentiment (using SentimentAnalysis package)
@@ -257,7 +260,7 @@ news.cleaned <- cbind(news.cleaned, desc.sentimentLM, desc.sentimentHE)
 sentiment.alt <- analyzeSentiment(news.cleaned.alt$Title, language = "english", aggregate = news.cleaned.alt$date)
 title.sentimentLM.alt <- sentiment.alt$SentimentLM
 title.sentimentHE.alt <- sentiment.alt$SentimentHE
-news.cleaned.alt <- cbind(news.full.alt, title.sentimentLM.alt, title.sentimentHE.alt)
+news.cleaned.alt <- cbind(news.cleaned.alt, title.sentimentLM.alt, title.sentimentHE.alt)
 #for description as a sanity check
 sentiment2.alt <- analyzeSentiment(news.cleaned.alt$textDiv, language = "english", aggregate = news.cleaned.alt$date)
 desc.sentimentLM.alt <- sentiment2.alt$SentimentLM
@@ -279,7 +282,7 @@ out.title <- with(
         date
     )
 )
-sentiment.ts <- xts(out$ave_sentiment, order.by=out.title$date)
+sentiment.ts <- xts(out.title$ave_sentiment, order.by=out.title$date)
 plot(sentiment.ts)
 #Now work on descriptions
 (out.desc <- with(
@@ -386,27 +389,72 @@ stretch <- na.contiguous(sentiment_scores)
 #subset GSPC (missing news before 2014-03-25)
 GSPC_full <- GSPC
 GSPC <- GSPC[1315:2767,]
-
 #There are still some NA's in USCHEX, we can do some imputation
 colSums(is.na(GSPC))
 GSPC <- na_locf(GSPC)
 ```
 
 
+
+Do the document term matrix approach
+```{r}
+```
+
+
+We have to offset our predictors as they are ordered time series. Hence, we aim to use predictors calculated at time t,to predict the direction at time t+1.
+```{r}
+#Remove non-relevant variables
+GSPC.plot <- GSPC
+drops <- c("GSPC.Open","GSPC.High","GSPC.Low","GSPC.Close","GSPC.Volume","GSPC.Adjusted","GSPC.Open.returns","GSPC.High.returns", "GSPC.Low.returns","GSPC.Close.returns", "GSPC.Adjusted.returns", "diff")
+GSPC<-GSPC[ , !(names(GSPC) %in% drops)]
+#lag predictors by 1 day
+test.case <- GSPC
+for (i in 2:33){
+  GSPC[,i] <- lag(GSPC[,i],1)
+}
+#Remove the first observation as we now have one row of NA's
+GSPC <- GSPC[-1,]
+```
+
+
+
+```{r}
+#convert to dataframe for methods that require it
+GSPC.df <- fortify.zoo(GSPC)
+#gspc.clean.df$direction <- factor(as.numeric(gspc.clean.df$direction == 2))
+#rownames(gspc.clean.df) <- gspc.clean.df[,1]
+#gspc.clean.df <- gspc.clean.df[,-1]
+GSPC.df$direction <- as.factor(GSPC.df$direction)
+levels(GSPC.df$direction) <- c("down", "up")
+```
+
+
 We now look at plots of the data
 ```{r}
 #Time series
-plot.zoo(GSPC$diff, xlab = "Month", ylab = "First difference of adjusted returns", col = 'blue', lwd = 0.5)
+#First, add back in the difference 
+plot.zoo(GSPC.plot$diff, xlab = "Month", ylab = "First difference of adjusted returns", col = 'blue', lwd = 0.5)
 #Correlation heatmap
-corr.df <- subset(GSPC, select = -c(GSPC.Open,GSPC.High,GSPC.Low,GSPC.Close,GSPC.Volume,GSPC.Adjusted,GSPC.Open.returns,GSPC.High.returns, GSPC.Low.returns,GSPC.Adjusted.returns))
+corr.df <- subset(GSPC.plot, select = -c(GSPC.Open, GSPC.High, GSPC.Low, GSPC.Close, GSPC.Volume, GSPC.Adjusted, GSPC.Open.returns, GSPC.High.returns, GSPC.Low.returns, GSPC.Close.returns, GSPC.Adjusted.returns))
 corr <- round(cor(corr.df),1)
 library(ggcorrplot)
 ggcorrplot(corr, tl.cex = 3)
+#table of increasing cases
+GSPC.plot.df <- fortify.zoo(GSPC.plot)
+GSPC.plot.df$direction <- as.factor(GSPC.plot.df$direction)
+levels(GSPC.plot.df$direction) <- c("down", "up")
+GSPC.plot.df %>% 
+  mutate(year = format(Index, "%Y")) %>%
+  group_by(year) %>% 
+  summarize(downs = sum(direction == "down"))
+GSPC.plot.df %>% 
+  mutate(year = format(Index, "%Y")) %>%
+  group_by(year) %>% 
+  summarize(ups = sum(direction == "up"))
 ```
-We can see that taking the first difference detrended the time series, and cetered it around zero. However, variance is still not constant, there is also clear signs of volatility clustering. However, we are focused on the direction of the time series, thus, the stationarity requirement is not as stringent. 
+We can see that taking the first difference detrended the time series, and centered it around zero. However, variance is still not constant, there is also clear signs of volatility clustering. However, we are focused on the direction of the time series, thus, the stationarity requirement is not as stringent. 
 
 The corrplot gives us a rough idea of which of our variables might end up being useful.
-
 
 We then perform a test for granger causality between the difference and our different fundamental and sentiment variables
 ```{r}
@@ -466,37 +514,20 @@ VARselect(GSPC.granger.8, lag.max = 10)
 grangertest(GSPC.Close.returns~desc.sr, order = 2, data=GSPC)
 ```
 
-We have to offset our predictors as they are ordered time series. Hence, we aim to use predictors calculated at time t,to predict the direction at time t+1.
+
 ```{r}
-#Remove non-relevant variables
-drops <- c("GSPC.Open","GSPC.High","GSPC.Low","GSPC.Close","GSPC.Volume","GSPC.Adjusted","GSPC.Open.returns","GSPC.High.returns", "GSPC.Low.returns","GSPC.Close.returns", "GSPC.Adjusted.returns", "diff")
-GSPC<-GSPC[ , !(names(GSPC) %in% drops)]
-#lag predictors by 1 day
-for (i in 14:45){
-  GSPC[,i] <- lag(GSPC[,i],1)
+GSPC.scaled <- GSPC.df
+#Try scaling first
+for (i in 3:33){
+  GSPC.scaled[,i] <- LinearScaling(GSPC.scaled[,i])
 }
-#Remove the first observation as we now have one row of NA's
-GSPC <- GSPC[-1,]
-```
-
-
-We cannot perform the usual resampling methods such as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
-The first dataset will be the full one with all variables included
-
-```{r}
-#convert to dataframe for methods that require it
-GSPC.df <- fortify.zoo(GSPC)
-#gspc.clean.df$direction <- factor(as.numeric(gspc.clean.df$direction == 2))
-#rownames(gspc.clean.df) <- gspc.clean.df[,1]
-#gspc.clean.df <- gspc.clean.df[,-1]
-levels(GSPC.df$direction) <- c("down", "up")
-```
-
-```{r}
 #Split into training and test set
-GSPC.end <- floor(0.8*nrow(GSPC.df)) #select the first 80% of the data
-GSPC.train <- GSPC.df[1:GSPC.end,] #assign the first 80% of the data to the train set
-GSPC.test <- GSPC.df[(GSPC.end+1):nrow(GSPC.df),]
+GSPC.end <- floor(0.7*nrow(GSPC.scaled)) #select the first 80% of the data
+GSPC.train <- GSPC.scaled[1:GSPC.end,] #assign the first 80% of the data to the train set
+GSPC.test <- GSPC.scaled[(GSPC.end+1):nrow(GSPC.scaled),]
+#Check that cases are well balanced
+sum(GSPC.test$direction == "down")
+sum(GSPC.test$direction == "up")
 ```
 
 ```{r}
@@ -511,14 +542,12 @@ GSPC.test.alt <- GSPC.alt[(GSPC.end.alt+1):nrow(GSPC.alt),]
 
 Create dataset with only sentiment (skip)
 ```{r}
-GSPC.s <- GSPC.clean
-dropss <- c("gspc_sentiment_title", "gspc_sentiment_desc")
-GSPC.s<-GSPC.s[ , !(names(GSPC.s) %in% dropss)]
-#Split into training and test set
-GSPC.train.s <- GSPC.s[1:GSPC.end,] #assign the first 80% of the data to the train set
-GSPC.test.s <- GSPC.s[(GSPC.end+1):nrow(GSPC.s),]
+
 ```
 
+
+We cannot perform the usual resampling methods such as LOOCV or k-fold CV as our data is ordered by time. However, the caret library allows for this by using a rolling window estimation method. 
+The first dataset will be the full one with all variables included
 
 Prepare for caret library
 ```{r}
@@ -527,34 +556,11 @@ set.seed(1)
 registerDoParallel(cores=6)
 myTimeControl <- trainControl(method = "timeslice",
                               initialWindow = 50,
-                              horizon = 2,
-                              fixedWindow = FALSE,
+                              horizon = 10,
+                              fixedWindow = TRUE,
                               classProbs = TRUE, 
                               summaryFunction = twoClassSummary,
                               allowParallel = TRUE)
-```
-
-
-Document term matrix
-```{r}
-#create alternate news source
-#news.alt <- news.cleaned
-
-#
-#news.tibble <- as_tibble(news.cleaned)
-#(news_tokens <- news.tibble %>%
-   #unnest_tokens(output = word, input = Title) %>%
-   # remove numbers
-   #filter(!str_detect(word, "^[0-9]*$")) %>%
-   # remove stop words
-   #anti_join(stop_words) %>%
-   # stem the words
-   #mutate(word = SnowballC::wordStem(word)))
-
-#news_dtm <- news_tokens %>%
-  #count(date, word) %>%
-  #cast_dtm(document = date, term = word, value = n)
-#removeSparseTerms(news_dtm, sparse = .99)
 ```
 
 
@@ -568,16 +574,27 @@ lasso.full <- train(direction ~ .,
                     method = "glmnet",
                     metric = "ROC",
                     family = "binomial",
-                    preProcess = c("range"),
+                    #preProcess = c("range"),
                     trControl = myTimeControl,
                     tuneGrid = lasso.grid)
-lasso.pred <- predict(lasso.full, GSPC.test)
+lasso.pred <- predict(lasso.full, newdata = GSPC.test)
 confusionMatrix(lasso.pred, GSPC.test$direction)
 #inspect model
 lasso.full
 plot(lasso.full)
 #Find out which coefficients remained
 coef(lasso.full$finalModel, lasso.full$bestTune$lambda)
+#Alternate pre-processing method
+lasso.full.alt <- train(direction ~ .,
+                    data = GSPC.train,
+                    method = "glmnet",
+                    metric = "ROC",
+                    family = "binomial",
+                    preProcess = c("center", "scale"),
+                    trControl = myTimeControl,
+                    tuneGrid = lasso.grid)
+lasso.pred.alt <- predict(lasso.full.alt, GSPC.test)
+confusionMatrix(lasso.pred.alt, GSPC.test$direction)
 ```
 We obtain an accuracy of 57.39%, hwoever, the model only predicted up.
 The LASSO model chosen by cross validation only kept DJIA and fastK.
@@ -586,8 +603,8 @@ The LASSO model chosen by cross validation only kept DJIA and fastK.
 Lasso with technical (1) only
 ```{r}
 #Create dataset for technical indicators (1) only, without sentiment and fundamentals (skip)
-GSPC.1 <- GSPC.df
-technicals1 <- c("direction", "SMA10","WMA10","momentum","fastK", "fastD","stochastic.k","stochastic.d","RSI","macd","MACD", "Williams.R", "Williams.AD", "CCI")
+GSPC.1 <- GSPC.scaled
+technicals1 <- c("direction", "SMA10","WMA10","momentum","fastK", "fastD","stochastic.k","stochastic.d")
 GSPC.1<-GSPC.1[ , (names(GSPC.1) %in% technicals1)]
 #Split into training and test set
 GSPC.train.1 <- GSPC.1[1:GSPC.end,] #assign the first 80% of the data to the train set
@@ -597,7 +614,7 @@ lasso.fit1 <- train(direction ~ .,
                     method = "glmnet",
                     metric = "ROC",
                     family = "binomial",
-                    preProcess = c("range"),
+                    #preProcess = c("center", "scale"),
                     trControl = myTimeControl,
                     tuneGrid = lasso.grid)
 lasso.pred1 <- predict(lasso.fit1, GSPC.test.1)
@@ -723,13 +740,14 @@ rf.fit.1 <- train(direction ~ .,
 
 SVM
 ```{r}
+GSPC.train$Index <- NULL
 #First we find the optimal tuning parameter
 svm.tune <- train(direction~.,
                   data = GSPC.train,
                   method = "svmRadial",   # Radial kernel
-                  tuneLength = 9,					# 9 values of the cost function
-                  preProc = c("range"),  # Center and scale data
-                  metric="ROC",
+                  tuneLength = 15,					# 9 values of the cost function
+                  #preProc = c("range"),  # Center and scale data
+                  metric="Accuracy",
                   trControl=myTimeControl)
 svm.tune
 ```
@@ -792,12 +810,40 @@ svm.tune.1 <- train(direction~.,
 
 Neural net
 ```{r}
-nnet.grid <- expand.grid(layer1 = 10, layer1 =20)
-nnet.fit <- train(direction ~ ., 
-                  data = GSPC.train,
-                  method = "mlpML",
-                  preProc = c("range"),
+nnet.grid <- expand.grid(.decay = c(0.5, 0.1), .size = c(5, 6, 7))
+nnet.fit <- train(GSPC.train[,-1], 
+                  GSPC.train$direction,
+                  method = "nnet",
+                  #preProc = c("range"),
                   maxit = 1000, 
                   tuneGrid = nnet.grid) 
+nnet.pred <- predict(nnet.fit, GSPC.test)
+confusionMatrix(nnet.pred, GSPC.test$direction)
+#alternate method
+mlp.grid <- expand.grid(layer1 = 10, layer2=10, layer3=10)
+nnet.fit2 <- train(x=GSPC.train[,-1], 
+                  y=GSPC.train$direction,
+                  method = "mlpML",
+                  preProc = c("range"),
+                  tuneGrid = mlp.grid) 
+nnet.pred.2 <- predict(nnet.fit2, GSPC.test)
+confusionMatrix(nnet.pred.2, GSPC.test$direction)
+```
+
+RFE
+```{r}
+ctrl <- rfeControl(functions = rfFuncs,
+                      method = "timeslice",
+                      initialWindow = 50,
+                      horizon = 2,
+                      fixedWindow = FALSE,
+                      classProbs = TRUE, 
+                      summaryFunction = twoClassSummary,
+                      allowParallel = TRUE)
+results <- rfe(x=GSPC.train[,-1], 
+                  y=GSPC.train$direction,
+                  sizes = c(1:5, 10, 15, 20, 25),
+                  preProc = c("center", "scale"),
+                  rfeControl = ctrl)
 ```
 
